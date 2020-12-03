@@ -1,6 +1,14 @@
 import algoliasearch from 'algoliasearch';
 import instantsearch from 'instantsearch.js';
-import { hits, pagination, refinementList } from 'instantsearch.js/es/widgets';
+import { 
+  hits, 
+  pagination, 
+  refinementList, 
+  hierarchicalMenu, 
+  numericMenu,
+  ratingMenu,
+  toggleRefinement
+ } from 'instantsearch.js/es/widgets';
 
 import resultHit from '../templates/result-hit';
 
@@ -29,6 +37,7 @@ class ResultPage {
     this._searchInstance = instantsearch({
       indexName: 'product_catalog',
       searchClient: this._searchClient,
+      routing: true
     });
   }
 
@@ -52,10 +61,37 @@ class ResultPage {
         container: '#brand-facet',
         attribute: 'brand',
       }),
-      refinementList({
-        container: '#categories-facet',
-        attribute: 'categories',
+      numericMenu({
+        container: '#price-slider',
+        attribute: 'price',
+        items: [
+          { label: 'All' },
+          { label: 'Less than $100', end: 100 },
+          { label: 'Between $100 - $500', start: 100, end: 500 },
+          { label: 'Between $500 - $1000', start: 500, end: 1000 },
+          { label: 'More than $1000', start: 1000 },
+        ],
       }),
+      hierarchicalMenu({
+        container: '#categories-facet',
+        attributes: [
+          'hierarchicalCategories.lvl0',
+          'hierarchicalCategories.lvl1',
+          'hierarchicalCategories.lvl2'
+        ]
+      }),
+      ratingMenu({
+        container: '#rating-menu',
+        attribute: 'rating',
+      }),
+      toggleRefinement({
+        container: '#toggle-refinement',
+        attribute: 'free_shipping',
+        templates: {
+          labelText: 'Free shipping',
+        },
+      })
+      
     ]);
   }
 
