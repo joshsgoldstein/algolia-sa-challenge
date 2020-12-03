@@ -1,6 +1,6 @@
 # Algolia
 
-## *Question 1*:
+## *Question 1*
 
 ### Question
 
@@ -20,7 +20,7 @@ Hi George,
 
 Great to hear you embarking on this journey of search engine education.  I would be more than happy to help you understand these concepts!  Lets take them one by one:
 
-**Records:**
+#### Records:
 
 A "record" is an object that may be added to an index so that it can be searched for. Records can contain any number of attributes. 
 
@@ -34,7 +34,7 @@ To put it to practice, lets say you are building a search engine for your produc
 
 An example of a product record in json is included below: 
 
-```bash
+```json
 {
   "name": "Iphone 6 64Gb",
   "brand": "Apple",
@@ -45,13 +45,13 @@ An example of a product record in json is included below:
 }
 ```
 
-**Indexing:**
+#### Indexing:
 
 "Indexing" is the process from which  original data from the source system (e.g., the individual products from the product catalog in the example above) and adding these records into the search engine. 
 
 For ease of understanding, the indexing process allows for data (e.g., the json file of product records referenced above) to be extracted from the file and added into the search engine. 
 
-**Custom Ranking**
+#### Custom Ranking
 
 Custom ranking gives you direct control to thoughtfully order results based on custom metrics within each record. It is often the deciding factor on which records appear in the first set of results. 
 
