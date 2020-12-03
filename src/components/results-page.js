@@ -37,6 +37,7 @@ class ResultPage {
     this._searchInstance = instantsearch({
       indexName: 'product_catalog',
       searchClient: this._searchClient,
+      routing: true
     });
   }
 
