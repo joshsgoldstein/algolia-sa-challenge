@@ -7,7 +7,10 @@ import {
   hierarchicalMenu, 
   numericMenu,
   ratingMenu,
-  toggleRefinement
+  toggleRefinement,
+  clearRefinements,
+  currentRefinements,
+  stats
  } from 'instantsearch.js/es/widgets';
 
 import resultHit from '../templates/result-hit';
@@ -90,6 +93,15 @@ class ResultPage {
         templates: {
           labelText: 'Free shipping',
         },
+      }),
+      clearRefinements({
+        container: '#clear-refinements',
+      }),
+      currentRefinements({
+        container: '#current-refinements',
+      }),
+      stats({
+        container: '#search-stats',
       })
       
     ]);
