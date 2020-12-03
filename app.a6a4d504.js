@@ -1025,7 +1025,8 @@ function EventEmitter() {
   EventEmitter.init.call(this);
 }
 
-module.exports = EventEmitter; // Backwards-compat with node 0.10.x
+module.exports = EventEmitter;
+module.exports.once = once; // Backwards-compat with node 0.10.x
 
 EventEmitter.EventEmitter = EventEmitter;
 EventEmitter.prototype._events = undefined;
@@ -1034,6 +1035,13 @@ EventEmitter.prototype._maxListeners = undefined; // By default EventEmitters wi
 // added to it. This is a useful default which helps finding memory leaks.
 
 var defaultMaxListeners = 10;
+
+function checkListener(listener) {
+  if (typeof listener !== 'function') {
+    throw new TypeError('The "listener" argument must be of type Function. Received type ' + typeof listener);
+  }
+}
+
 Object.defineProperty(EventEmitter, 'defaultMaxListeners', {
   enumerable: true,
   get: function () {
@@ -1068,13 +1076,13 @@ EventEmitter.prototype.setMaxListeners = function setMaxListeners(n) {
   return this;
 };
 
-function $getMaxListeners(that) {
+function _getMaxListeners(that) {
   if (that._maxListeners === undefined) return EventEmitter.defaultMaxListeners;
   return that._maxListeners;
 }
 
 EventEmitter.prototype.getMaxListeners = function getMaxListeners() {
-  return $getMaxListeners(this);
+  return _getMaxListeners(this);
 };
 
 EventEmitter.prototype.emit = function emit(type) {
@@ -1121,11 +1129,7 @@ function _addListener(target, type, listener, prepend) {
   var m;
   var events;
   var existing;
-
-  if (typeof listener !== 'function') {
-    throw new TypeError('The "listener" argument must be of type Function. Received type ' + typeof listener);
-  }
-
+  checkListener(listener);
   events = target._events;
 
   if (events === undefined) {
@@ -1159,7 +1163,7 @@ function _addListener(target, type, listener, prepend) {
     } // Check for listener leak
 
 
-    m = $getMaxListeners(target);
+    m = _getMaxListeners(target);
 
     if (m > 0 && existing.length > m && !existing.warned) {
       existing.warned = true; // No error code for this since it is a Warning
@@ -1188,14 +1192,11 @@ EventEmitter.prototype.prependListener = function prependListener(type, listener
 };
 
 function onceWrapper() {
-  var args = [];
-
-  for (var i = 0; i < arguments.length; i++) args.push(arguments[i]);
-
   if (!this.fired) {
     this.target.removeListener(this.type, this.wrapFn);
     this.fired = true;
-    ReflectApply(this.listener, this.target, args);
+    if (arguments.length === 0) return this.listener.call(this.target);
+    return this.listener.apply(this.target, arguments);
   }
 }
 
@@ -1214,19 +1215,13 @@ function _onceWrap(target, type, listener) {
 }
 
 EventEmitter.prototype.once = function once(type, listener) {
-  if (typeof listener !== 'function') {
-    throw new TypeError('The "listener" argument must be of type Function. Received type ' + typeof listener);
-  }
-
+  checkListener(listener);
   this.on(type, _onceWrap(this, type, listener));
   return this;
 };
 
 EventEmitter.prototype.prependOnceListener = function prependOnceListener(type, listener) {
-  if (typeof listener !== 'function') {
-    throw new TypeError('The "listener" argument must be of type Function. Received type ' + typeof listener);
-  }
-
+  checkListener(listener);
   this.prependListener(type, _onceWrap(this, type, listener));
   return this;
 }; // Emits a 'removeListener' event if and only if the listener was removed.
@@ -1234,11 +1229,7 @@ EventEmitter.prototype.prependOnceListener = function prependOnceListener(type, 
 
 EventEmitter.prototype.removeListener = function removeListener(type, listener) {
   var list, events, position, i, originalListener;
-
-  if (typeof listener !== 'function') {
-    throw new TypeError('The "listener" argument must be of type Function. Received type ' + typeof listener);
-  }
-
+  checkListener(listener);
   events = this._events;
   if (events === undefined) return this;
   list = events[type];
@@ -1389,6 +1380,37 @@ function unwrapListeners(arr) {
   }
 
   return ret;
+}
+
+function once(emitter, name) {
+  return new Promise(function (resolve, reject) {
+    function eventListener() {
+      if (errorListener !== undefined) {
+        emitter.removeListener('error', errorListener);
+      }
+
+      resolve([].slice.call(arguments));
+    }
+
+    ;
+    var errorListener; // Adding an error listener is not optional because
+    // if an error is thrown on an event emitter we cannot
+    // guarantee that the actual event we are waiting will
+    // be fired. The result could be a silent way to create
+    // memory or file descriptor leaks, which is something
+    // we should avoid.
+
+    if (name !== 'error') {
+      errorListener = function errorListener(err) {
+        emitter.removeListener(name, eventListener);
+        reject(err);
+      };
+
+      emitter.once('error', errorListener);
+    }
+
+    emitter.once(name, eventListener);
+  });
 }
 },{}],"node_modules/algoliasearch/src/IndexBrowser.js":[function(require,module,exports) {
 'use strict'; // This is the object returned by the `index.browseAll()` method
@@ -2761,7 +2783,7 @@ Index.prototype.updateApiKey = deprecate(function (key, acls, params, callback) 
     callback: callback
   });
 }, deprecatedMessage('index.updateApiKey()', 'client.updateApiKey()'));
-},{"inherits":"node_modules/inherits/inherits_browser.js","./IndexCore.js":"node_modules/algoliasearch/src/IndexCore.js","./deprecate.js":"node_modules/algoliasearch/src/deprecate.js","./deprecatedMessage.js":"node_modules/algoliasearch/src/deprecatedMessage.js","./exitPromise.js":"node_modules/algoliasearch/src/exitPromise.js","./errors":"node_modules/algoliasearch/src/errors.js","isarray":"node_modules/algoliasearch/node_modules/isarray/index.js","./map.js":"node_modules/algoliasearch/src/map.js","./clone.js":"node_modules/algoliasearch/src/clone.js","./merge.js":"node_modules/algoliasearch/src/merge.js","./IndexBrowser":"node_modules/algoliasearch/src/IndexBrowser.js"}],"node_modules/debug/node_modules/ms/index.js":[function(require,module,exports) {
+},{"inherits":"node_modules/inherits/inherits_browser.js","./IndexCore.js":"node_modules/algoliasearch/src/IndexCore.js","./deprecate.js":"node_modules/algoliasearch/src/deprecate.js","./deprecatedMessage.js":"node_modules/algoliasearch/src/deprecatedMessage.js","./exitPromise.js":"node_modules/algoliasearch/src/exitPromise.js","./errors":"node_modules/algoliasearch/src/errors.js","isarray":"node_modules/algoliasearch/node_modules/isarray/index.js","./map.js":"node_modules/algoliasearch/src/map.js","./clone.js":"node_modules/algoliasearch/src/clone.js","./merge.js":"node_modules/algoliasearch/src/merge.js","./IndexBrowser":"node_modules/algoliasearch/src/IndexBrowser.js"}],"node_modules/ms/index.js":[function(require,module,exports) {
 /**
  * Helpers.
  */
@@ -3119,7 +3141,7 @@ function coerce(val) {
   return val;
 }
 
-},{"ms":"node_modules/debug/node_modules/ms/index.js"}],"node_modules/process/browser.js":[function(require,module,exports) {
+},{"ms":"node_modules/ms/index.js"}],"node_modules/process/browser.js":[function(require,module,exports) {
 
 // shim for using process in browser
 var process = module.exports = {}; // cached from whatever global is present so that test runners that stub it
@@ -7277,13 +7299,20 @@ module.exports = merge;
 'use strict';
 
 // NOTE: this behaves like lodash/defaults, but doesn't mutate the target
+// it also preserve keys order
 module.exports = function defaultsPure() {
   var sources = Array.prototype.slice.call(arguments);
+
   return sources.reduceRight(function(acc, source) {
     Object.keys(Object(source)).forEach(function(key) {
-      if (source[key] !== undefined) {
-        acc[key] = source[key];
+      if (source[key] === undefined) {
+        return;
       }
+      if (acc[key] !== undefined) {
+        // remove if already added, so that we can add it in correct order
+        delete acc[key];
+      }
+      acc[key] = source[key];
     });
     return acc;
   }, {});
@@ -7467,7 +7496,7 @@ var lib = {
       }
       return {};
     } else if (typeof attribute === 'string') {
-      return omit(refinementList, attribute);
+      return omit(refinementList, [attribute]);
     } else if (typeof attribute === 'function') {
       var hasChanged = false;
 
@@ -7766,9 +7795,12 @@ SearchParameters._parseNumbers = function(partialState) {
   // the one which is an array of float geo rectangles
   if (Array.isArray(partialState.insideBoundingBox)) {
     numbers.insideBoundingBox = partialState.insideBoundingBox.map(function(geoRect) {
-      return geoRect.map(function(value) {
-        return parseFloat(value);
-      });
+      if (Array.isArray(geoRect)) {
+        return geoRect.map(function(value) {
+          return parseFloat(value);
+        });
+      }
+      return geoRect;
     });
   }
 
@@ -8148,7 +8180,7 @@ SearchParameters.prototype = {
   /**
    * Get the list of numeric refinements for a single facet
    * @param {string} facetName name of the attribute used for faceting
-   * @return {SearchParameters.OperatorList[]} list of refinements
+   * @return {SearchParameters.OperatorList} list of refinements
    */
   getNumericRefinements: function(facetName) {
     return this.numericRefinements[facetName] || {};
@@ -8179,10 +8211,7 @@ SearchParameters.prototype = {
       }
       return {};
     } else if (typeof attribute === 'string') {
-      if (!objectHasKeys(this.numericRefinements[attribute])) {
-        return this.numericRefinements;
-      }
-      return omit(this.numericRefinements, attribute);
+      return omit(this.numericRefinements, [attribute]);
     } else if (typeof attribute === 'function') {
       var hasChanged = false;
       var numericRefinements = this.numericRefinements;
@@ -9596,50 +9625,146 @@ function SearchResults(state, results) {
 
   this._rawResults = results;
 
+  var self = this;
+
+  // https://www.algolia.com/doc/api-reference/api-methods/search/#response
+  Object.keys(mainSubResponse).forEach(function(key) {
+    self[key] = mainSubResponse[key];
+  });
+
   /**
    * query used to generate the results
+   * @name query
    * @member {string}
+   * @memberof SearchResults
+   * @instance
    */
-  this.query = mainSubResponse.query;
   /**
    * The query as parsed by the engine given all the rules.
+   * @name parsedQuery
    * @member {string}
+   * @memberof SearchResults
+   * @instance
    */
-  this.parsedQuery = mainSubResponse.parsedQuery;
   /**
    * all the records that match the search parameters. Each record is
    * augmented with a new attribute `_highlightResult`
    * which is an object keyed by attribute and with the following properties:
    *  - `value` : the value of the facet highlighted (html)
    *  - `matchLevel`: full, partial or none depending on how the query terms match
+   * @name hits
    * @member {object[]}
+   * @memberof SearchResults
+   * @instance
    */
-  this.hits = mainSubResponse.hits;
   /**
    * index where the results come from
+   * @name index
    * @member {string}
+   * @memberof SearchResults
+   * @instance
    */
-  this.index = mainSubResponse.index;
   /**
    * number of hits per page requested
+   * @name hitsPerPage
    * @member {number}
+   * @memberof SearchResults
+   * @instance
    */
-  this.hitsPerPage = mainSubResponse.hitsPerPage;
   /**
    * total number of hits of this query on the index
+   * @name nbHits
    * @member {number}
+   * @memberof SearchResults
+   * @instance
    */
-  this.nbHits = mainSubResponse.nbHits;
   /**
    * total number of pages with respect to the number of hits per page and the total number of hits
+   * @name nbPages
    * @member {number}
+   * @memberof SearchResults
+   * @instance
    */
-  this.nbPages = mainSubResponse.nbPages;
   /**
    * current page
+   * @name page
    * @member {number}
+   * @memberof SearchResults
+   * @instance
    */
-  this.page = mainSubResponse.page;
+  /**
+   * The position if the position was guessed by IP.
+   * @name aroundLatLng
+   * @member {string}
+   * @memberof SearchResults
+   * @instance
+   * @example "48.8637,2.3615",
+   */
+  /**
+   * The radius computed by Algolia.
+   * @name automaticRadius
+   * @member {string}
+   * @memberof SearchResults
+   * @instance
+   * @example "126792922",
+   */
+  /**
+   * String identifying the server used to serve this request.
+   *
+   * getRankingInfo needs to be set to `true` for this to be returned
+   *
+   * @name serverUsed
+   * @member {string}
+   * @memberof SearchResults
+   * @instance
+   * @example "c7-use-2.algolia.net",
+   */
+  /**
+   * Boolean that indicates if the computation of the counts did time out.
+   * @deprecated
+   * @name timeoutCounts
+   * @member {boolean}
+   * @memberof SearchResults
+   * @instance
+   */
+  /**
+   * Boolean that indicates if the computation of the hits did time out.
+   * @deprecated
+   * @name timeoutHits
+   * @member {boolean}
+   * @memberof SearchResults
+   * @instance
+   */
+  /**
+   * True if the counts of the facets is exhaustive
+   * @name exhaustiveFacetsCount
+   * @member {boolean}
+   * @memberof SearchResults
+   * @instance
+   */
+  /**
+   * True if the number of hits is exhaustive
+   * @name exhaustiveNbHits
+   * @member {boolean}
+   * @memberof SearchResults
+   * @instance
+   */
+  /**
+   * Contains the userData if they are set by a [query rule](https://www.algolia.com/doc/guides/query-rules/query-rules-overview/).
+   * @name userData
+   * @member {object[]}
+   * @memberof SearchResults
+   * @instance
+   */
+  /**
+   * queryID is the unique identifier of the query used to generate the current search results.
+   * This value is only available if the `clickAnalytics` search parameter is set to `true`.
+   * @name queryID
+   * @member {string}
+   * @memberof SearchResults
+   * @instance
+   */
+
   /**
    * sum of the processing time of all the queries
    * @member {number}
@@ -9649,65 +9774,6 @@ function SearchResults(state, results) {
       ? sum
       : sum + result.processingTimeMS;
   }, 0);
-  /**
-   * The position if the position was guessed by IP.
-   * @member {string}
-   * @example "48.8637,2.3615",
-   */
-  this.aroundLatLng = mainSubResponse.aroundLatLng;
-  /**
-   * The radius computed by Algolia.
-   * @member {string}
-   * @example "126792922",
-   */
-  this.automaticRadius = mainSubResponse.automaticRadius;
-  /**
-   * String identifying the server used to serve this request.
-   *
-   * getRankingInfo needs to be set to `true` for this to be returned
-   *
-   * @member {string}
-   * @example "c7-use-2.algolia.net",
-   */
-  this.serverUsed = mainSubResponse.serverUsed;
-  /**
-   * Boolean that indicates if the computation of the counts did time out.
-   * @deprecated
-   * @member {boolean}
-   */
-  this.timeoutCounts = mainSubResponse.timeoutCounts;
-  /**
-   * Boolean that indicates if the computation of the hits did time out.
-   * @deprecated
-   * @member {boolean}
-   */
-  this.timeoutHits = mainSubResponse.timeoutHits;
-
-  /**
-   * True if the counts of the facets is exhaustive
-   * @member {boolean}
-   */
-  this.exhaustiveFacetsCount = mainSubResponse.exhaustiveFacetsCount;
-
-  /**
-   * True if the number of hits is exhaustive
-   * @member {boolean}
-   */
-  this.exhaustiveNbHits = mainSubResponse.exhaustiveNbHits;
-
-
-  /**
-   * Contains the userData if they are set by a [query rule](https://www.algolia.com/doc/guides/query-rules/query-rules-overview/).
-   * @member {object[]}
-   */
-  this.userData = mainSubResponse.userData;
-
-  /**
-   * queryID is the unique identifier of the query used to generate the current search results.
-   * This value is only available if the `clickAnalytics` search parameter is set to `true`.
-   * @member {string}
-   */
-  this.queryID = mainSubResponse.queryID;
 
   /**
    * disjunctive facets results
@@ -9733,7 +9799,6 @@ function SearchResults(state, results) {
   var disjunctiveFacetsIndices = getIndices(state.disjunctiveFacets);
   var nextDisjunctiveResult = 1;
 
-  var self = this;
   // Since we send request only for disjunctive facets that have been refined,
   // we get the facets information from the first, general, response.
 
@@ -10635,7 +10700,7 @@ module.exports = requestBuilder;
 },{"./functions/merge":"node_modules/algoliasearch-helper/src/functions/merge.js"}],"node_modules/algoliasearch-helper/src/version.js":[function(require,module,exports) {
 'use strict';
 
-module.exports = '0.0.0-5a0352a';
+module.exports = '3.3.3';
 
 },{}],"node_modules/algoliasearch-helper/src/algoliasearch.helper.js":[function(require,module,exports) {
 'use strict';
@@ -12319,13 +12384,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -12389,14 +12454,6 @@ function prepareTemplates() {
 }
 /**
  * Prepares an object to be passed to the Template widget
- * @param {object} unknownBecauseES6 an object with the following attributes:
- *  - defaultTemplate
- *  - templates
- *  - templatesConfig
- * @return {object} the configuration with the attributes:
- *  - defaultTemplate
- *  - templates
- *  - useCustomCompileOptions
  */
 
 
@@ -13248,13 +13305,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -13306,7 +13363,8 @@ function renderTemplate(_ref) {
       templateKey = _ref.templateKey,
       compileOptions = _ref.compileOptions,
       helpers = _ref.helpers,
-      data = _ref.data;
+      data = _ref.data,
+      bindEvent = _ref.bindEvent;
   var template = templates[templateKey];
 
   var templateType = _typeof(template);
@@ -13319,7 +13377,7 @@ function renderTemplate(_ref) {
   }
 
   if (isTemplateFunction) {
-    return template(data);
+    return template(data, bindEvent);
   }
 
   var transformedHelpers = transformHelpersToHogan(helpers, compileOptions, data);
@@ -13346,12 +13404,18 @@ exports.default = void 0;
 // was decided as too risky.
 // @MAJOR Replace with the native `Array.prototype.find` method
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/find
-function find(items, predicate, thisArg) {
-  if (!Array.prototype.find) {
-    return items.filter(predicate, thisArg)[0];
+function find(items, predicate) {
+  var value;
+
+  for (var i = 0; i < items.length; i++) {
+    value = items[i]; // inlined for performance: if (Call(predicate, thisArg, [value, i, list])) {
+
+    if (predicate(value, i, items)) {
+      return value;
+    }
   }
 
-  return items.find(predicate, thisArg);
+  return undefined;
 }
 
 var _default = find;
@@ -13590,6 +13654,20 @@ function escapeRefinement(value) {
 
 var _default = escapeRefinement;
 exports.default = _default;
+},{}],"node_modules/instantsearch.js/es/lib/utils/getObjectType.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+function getObjectType(object) {
+  return Object.prototype.toString.call(object).slice(8, -1);
+}
+
+var _default = getObjectType;
+exports.default = _default;
 },{}],"node_modules/instantsearch.js/es/lib/utils/checkRendering.js":[function(require,module,exports) {
 "use strict";
 
@@ -13598,46 +13676,19 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports.default = void 0;
 
-function _typeof(obj) {
-  if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") {
-    _typeof = function _typeof(obj) {
-      return typeof obj;
-    };
-  } else {
-    _typeof = function _typeof(obj) {
-      return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj;
-    };
-  }
+var _getObjectType = _interopRequireDefault(require("./getObjectType"));
 
-  return _typeof(obj);
-}
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function checkRendering(rendering, usage) {
   if (rendering === undefined || typeof rendering !== 'function') {
-    throw new Error("The render function is not valid (got type \"".concat(_typeof(rendering), "\").\n\n").concat(usage));
+    throw new Error("The render function is not valid (received type ".concat((0, _getObjectType.default)(rendering), ").\n\n").concat(usage));
   }
 }
 
 var _default = checkRendering;
 exports.default = _default;
-},{}],"node_modules/instantsearch.js/es/lib/utils/getPropertyByPath.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.default = void 0;
-
-function getPropertyByPath(object, path) {
-  var parts = path.split('.');
-  return parts.reduce(function (current, key) {
-    return current && current[key];
-  }, object);
-}
-
-var _default = getPropertyByPath;
-exports.default = _default;
-},{}],"node_modules/instantsearch.js/es/lib/utils/noop.js":[function(require,module,exports) {
+},{"./getObjectType":"node_modules/instantsearch.js/es/lib/utils/getObjectType.js"}],"node_modules/instantsearch.js/es/lib/utils/noop.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -13648,6 +13699,308 @@ exports.default = void 0;
 function noop() {}
 
 var _default = noop;
+exports.default = _default;
+},{}],"node_modules/instantsearch.js/es/lib/utils/logger.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.warning = exports.deprecate = exports.warn = void 0;
+
+var _noop = _interopRequireDefault(require("./noop"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * Logs a warning when this function is called, in development environment only.
+ */
+var deprecate = function deprecate(fn) {
+  return fn;
+};
+/**
+ * Logs a warning
+ * This is used to log issues in development environment only.
+ */
+
+
+exports.deprecate = deprecate;
+var warn = _noop.default;
+/**
+ * Logs a warning if the condition is not met.
+ * This is used to log issues in development environment only.
+ */
+
+exports.warn = warn;
+var _warning = _noop.default;
+exports.warning = _warning;
+
+if ("development" === 'development') {
+  exports.warn = warn = function warn(message) {
+    // eslint-disable-next-line no-console
+    console.warn("[InstantSearch.js]: ".concat(message.trim()));
+  };
+
+  exports.deprecate = deprecate = function deprecate(fn, message) {
+    var hasAlreadyPrinted = false;
+    return function () {
+      if (!hasAlreadyPrinted) {
+        hasAlreadyPrinted = true;
+        warn(message);
+      }
+
+      return fn.apply(void 0, arguments);
+    };
+  };
+
+  exports.warning = _warning = function warning(condition, message) {
+    if (condition) {
+      return;
+    }
+
+    var hasAlreadyPrinted = _warning.cache[message];
+
+    if (!hasAlreadyPrinted) {
+      _warning.cache[message] = true;
+      warn(message);
+    }
+  };
+
+  _warning.cache = {};
+}
+},{"./noop":"node_modules/instantsearch.js/es/lib/utils/noop.js"}],"node_modules/instantsearch.js/es/lib/utils/checkIndexUiState.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.checkIndexUiState = checkIndexUiState;
+
+var _capitalize = _interopRequireDefault(require("./capitalize"));
+
+var _logger = require("./logger");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _toConsumableArray(arr) {
+  return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _nonIterableSpread();
+}
+
+function _nonIterableSpread() {
+  throw new TypeError("Invalid attempt to spread non-iterable instance");
+}
+
+function _iterableToArray(iter) {
+  if (Symbol.iterator in Object(iter) || Object.prototype.toString.call(iter) === "[object Arguments]") return Array.from(iter);
+}
+
+function _arrayWithoutHoles(arr) {
+  if (Array.isArray(arr)) {
+    for (var i = 0, arr2 = new Array(arr.length); i < arr.length; i++) {
+      arr2[i] = arr[i];
+    }
+
+    return arr2;
+  }
+}
+
+function _slicedToArray(arr, i) {
+  return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _nonIterableRest();
+}
+
+function _nonIterableRest() {
+  throw new TypeError("Invalid attempt to destructure non-iterable instance");
+}
+
+function _iterableToArrayLimit(arr, i) {
+  if (!(Symbol.iterator in Object(arr) || Object.prototype.toString.call(arr) === "[object Arguments]")) {
+    return;
+  }
+
+  var _arr = [];
+  var _n = true;
+  var _d = false;
+  var _e = undefined;
+
+  try {
+    for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) {
+      _arr.push(_s.value);
+
+      if (i && _arr.length === i) break;
+    }
+  } catch (err) {
+    _d = true;
+    _e = err;
+  } finally {
+    try {
+      if (!_n && _i["return"] != null) _i["return"]();
+    } finally {
+      if (_d) throw _e;
+    }
+  }
+
+  return _arr;
+}
+
+function _arrayWithHoles(arr) {
+  if (Array.isArray(arr)) return arr;
+}
+
+// Some connectors are responsible for multiple widgets so we need
+// to map them.
+function getWidgetNames(connectorName) {
+  switch (connectorName) {
+    case 'range':
+      return [];
+
+    case 'menu':
+      return ['menu', 'menuSelect'];
+
+    default:
+      return [connectorName];
+  }
+}
+
+var stateToWidgetsMap = {
+  query: {
+    connectors: ['connectSearchBox'],
+    widgets: ['ais.searchBox', 'ais.autocomplete', 'ais.voiceSearch']
+  },
+  refinementList: {
+    connectors: ['connectRefinementList'],
+    widgets: ['ais.refinementList']
+  },
+  menu: {
+    connectors: ['connectMenu'],
+    widgets: ['ais.menu']
+  },
+  hierarchicalMenu: {
+    connectors: ['connectHierarchicalMenu'],
+    widgets: ['ais.hierarchicalMenu']
+  },
+  numericMenu: {
+    connectors: ['connectNumericMenu'],
+    widgets: ['ais.numericMenu']
+  },
+  ratingMenu: {
+    connectors: ['connectRatingMenu'],
+    widgets: ['ais.ratingMenu']
+  },
+  range: {
+    connectors: ['connectRange'],
+    widgets: ['ais.rangeInput', 'ais.rangeSlider', 'ais.range']
+  },
+  toggle: {
+    connectors: ['connectToggleRefinement'],
+    widgets: ['ais.toggleRefinement']
+  },
+  geoSearch: {
+    connectors: ['connectGeoSearch'],
+    widgets: ['ais.geoSearch']
+  },
+  sortBy: {
+    connectors: ['connectSortBy'],
+    widgets: ['ais.sortBy']
+  },
+  page: {
+    connectors: ['connectPagination'],
+    widgets: ['ais.pagination', 'ais.infiniteHits']
+  },
+  hitsPerPage: {
+    connectors: ['connectHitsPerPage'],
+    widgets: ['ais.hitsPerPage']
+  },
+  configure: {
+    connectors: ['connectConfigure'],
+    widgets: ['ais.configure']
+  },
+  places: {
+    connectors: [],
+    widgets: ['ais.places']
+  }
+};
+
+function checkIndexUiState(_ref) {
+  var index = _ref.index,
+      indexUiState = _ref.indexUiState;
+  var mountedWidgets = index.getWidgets().map(function (widget) {
+    return widget.$$type;
+  }).filter(Boolean);
+  var missingWidgets = Object.keys(indexUiState).reduce(function (acc, parameter) {
+    var requiredWidgets = stateToWidgetsMap[parameter] && stateToWidgetsMap[parameter].widgets;
+
+    if (requiredWidgets && !requiredWidgets.some(function (requiredWidget) {
+      return mountedWidgets.includes(requiredWidget);
+    })) {
+      acc.push([parameter, {
+        connectors: stateToWidgetsMap[parameter].connectors,
+        widgets: stateToWidgetsMap[parameter].widgets.map(function (widgetIdentifier) {
+          return widgetIdentifier.split('ais.')[1];
+        })
+      }]);
+    }
+
+    return acc;
+  }, []);
+  "development" === 'development' ? (0, _logger.warning)(missingWidgets.length === 0, "The UI state for the index \"".concat(index.getIndexId(), "\" is not consistent with the widgets mounted.\n\nThis can happen when the UI state is specified via `initialUiState`, `routing` or `setUiState` but that the widgets responsible for this state were not added. This results in those query parameters not being sent to the API.\n\nTo fully reflect the state, some widgets need to be added to the index \"").concat(index.getIndexId(), "\":\n\n").concat(missingWidgets.map(function (_ref2) {
+    var _ref4;
+
+    var _ref3 = _slicedToArray(_ref2, 2),
+        stateParameter = _ref3[0],
+        widgets = _ref3[1].widgets;
+
+    return "- `".concat(stateParameter, "` needs one of these widgets: ").concat((_ref4 = []).concat.apply(_ref4, _toConsumableArray(widgets.map(function (name) {
+      return getWidgetNames(name);
+    }))).map(function (name) {
+      return "\"".concat(name, "\"");
+    }).join(', '));
+  }).join('\n'), "\n\nIf you do not wish to display widgets but still want to support their search parameters, you can mount \"virtual widgets\" that don't render anything:\n\n```\n").concat(missingWidgets.filter(function (_ref5) {
+    var _ref6 = _slicedToArray(_ref5, 2),
+        _stateParameter = _ref6[0],
+        connectors = _ref6[1].connectors;
+
+    return connectors.length > 0;
+  }).map(function (_ref7) {
+    var _ref8 = _slicedToArray(_ref7, 2),
+        _stateParameter = _ref8[0],
+        _ref8$ = _ref8[1],
+        connectors = _ref8$.connectors,
+        widgets = _ref8$.widgets;
+
+    var capitalizedWidget = (0, _capitalize.default)(widgets[0]);
+    var connectorName = connectors[0];
+    return "const virtual".concat(capitalizedWidget, " = ").concat(connectorName, "(() => null);");
+  }).join('\n'), "\n\nsearch.addWidgets([\n  ").concat(missingWidgets.filter(function (_ref9) {
+    var _ref10 = _slicedToArray(_ref9, 2),
+        _stateParameter = _ref10[0],
+        connectors = _ref10[1].connectors;
+
+    return connectors.length > 0;
+  }).map(function (_ref11) {
+    var _ref12 = _slicedToArray(_ref11, 2),
+        _stateParameter = _ref12[0],
+        widgets = _ref12[1].widgets;
+
+    var capitalizedWidget = (0, _capitalize.default)(widgets[0]);
+    return "virtual".concat(capitalizedWidget, "({ /* ... */ })");
+  }).join(',\n  '), "\n]);\n```\n\nIf you're using custom widgets that do set these query parameters, we recommend using connectors instead.\n\nSee https://www.algolia.com/doc/guides/building-search-ui/widgets/customize-an-existing-widget/js/#customize-the-complete-ui-of-the-widgets")) : void 0;
+}
+},{"./capitalize":"node_modules/instantsearch.js/es/lib/utils/capitalize.js","./logger":"node_modules/instantsearch.js/es/lib/utils/logger.js"}],"node_modules/instantsearch.js/es/lib/utils/getPropertyByPath.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+function getPropertyByPath(object, path) {
+  var parts = Array.isArray(path) ? path : path.split('.');
+  return parts.reduce(function (current, key) {
+    return current && current[key];
+  }, object);
+}
+
+var _default = getPropertyByPath;
 exports.default = _default;
 },{}],"node_modules/instantsearch.js/es/lib/utils/isFiniteNumber.js":[function(require,module,exports) {
 "use strict";
@@ -13777,7 +14130,7 @@ function range(_ref) {
 
   var arrayLength = Math.round((end - start) / limitStep);
   return _toConsumableArray(Array(arrayLength)).map(function (_, current) {
-    return (start + current) * limitStep;
+    return start + current * limitStep;
   });
 }
 
@@ -13924,13 +14277,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -14130,75 +14483,21 @@ var resolveSearchParameters = function resolveSearchParameters(current) {
 
 var _default = resolveSearchParameters;
 exports.default = _default;
-},{}],"node_modules/instantsearch.js/es/lib/utils/logger.js":[function(require,module,exports) {
+},{}],"node_modules/instantsearch.js/es/lib/utils/toArray.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.warning = exports.deprecate = exports.warn = void 0;
+exports.default = void 0;
 
-var _noop = _interopRequireDefault(require("./noop"));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-/**
- * Logs a warning when this function is called, in development environment only.
- */
-var deprecate = function deprecate(fn) {
-  return fn;
-};
-/**
- * Logs a warning
- * This is used to log issues in development environment only.
- */
-
-
-exports.deprecate = deprecate;
-var warn = _noop.default;
-/**
- * Logs a warning if the condition is not met.
- * This is used to log issues in development environment only.
- */
-
-exports.warn = warn;
-var _warning = _noop.default;
-exports.warning = _warning;
-
-if ("development" === 'development') {
-  exports.warn = warn = function warn(message) {
-    // eslint-disable-next-line no-console
-    console.warn("[InstantSearch.js]: ".concat(message.trim()));
-  };
-
-  exports.deprecate = deprecate = function deprecate(fn, message) {
-    var hasAlreadyPrinted = false;
-    return function () {
-      if (!hasAlreadyPrinted) {
-        hasAlreadyPrinted = true;
-        warn(message);
-      }
-
-      return fn.apply(void 0, arguments);
-    };
-  };
-
-  exports.warning = _warning = function warning(condition, message) {
-    if (condition) {
-      return;
-    }
-
-    var hasAlreadyPrinted = _warning.cache[message];
-
-    if (!hasAlreadyPrinted) {
-      _warning.cache[message] = true;
-      warn(message);
-    }
-  };
-
-  _warning.cache = {};
+function toArray(value) {
+  return Array.isArray(value) ? value : [value];
 }
-},{"./noop":"node_modules/instantsearch.js/es/lib/utils/noop.js"}],"node_modules/instantsearch.js/es/lib/utils/documentation.js":[function(require,module,exports) {
+
+var _default = toArray;
+exports.default = _default;
+},{}],"node_modules/instantsearch.js/es/lib/utils/documentation.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -14302,7 +14601,7 @@ function insideBoundingBoxArrayToBoundingBox(value) {
   var _value = _slicedToArray(value, 1),
       _value$ = _value[0];
 
-  _value$ = _value$ === void 0 ? [] : _value$;
+  _value$ = _value$ === void 0 ? [undefined, undefined, undefined, undefined] : _value$;
 
   var _value$2 = _slicedToArray(_value$, 4),
       neLat = _value$2[0],
@@ -14388,13 +14687,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -14454,13 +14753,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -14497,12 +14796,345 @@ var addQueryID = function addQueryID(hits, queryID) {
 };
 
 exports.addQueryID = addQueryID;
+},{}],"node_modules/instantsearch.js/es/lib/utils/isFacetRefined.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = isFacetRefined;
+
+function isFacetRefined(helper, facet, value) {
+  if (helper.state.isHierarchicalFacet(facet)) {
+    return helper.state.isHierarchicalFacetRefined(facet, value);
+  } else if (helper.state.isConjunctiveFacet(facet)) {
+    return helper.state.isFacetRefined(facet, value);
+  } else {
+    return helper.state.isDisjunctiveFacetRefined(facet, value);
+  }
+}
+},{}],"node_modules/instantsearch.js/es/lib/utils/createSendEventForFacet.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.createSendEventForFacet = createSendEventForFacet;
+
+var _isFacetRefined = _interopRequireDefault(require("./isFacetRefined"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _typeof(obj) {
+  if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") {
+    _typeof = function _typeof(obj) {
+      return typeof obj;
+    };
+  } else {
+    _typeof = function _typeof(obj) {
+      return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj;
+    };
+  }
+
+  return _typeof(obj);
+}
+
+function createSendEventForFacet(_ref) {
+  var instantSearchInstance = _ref.instantSearchInstance,
+      helper = _ref.helper,
+      attribute = _ref.attribute,
+      widgetType = _ref.widgetType;
+
+  var sendEventForFacet = function sendEventForFacet() {
+    for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
+      args[_key] = arguments[_key];
+    }
+
+    var eventType = args[0],
+        facetValue = args[1],
+        _args$ = args[2],
+        eventName = _args$ === void 0 ? 'Filter Applied' : _args$;
+
+    if (args.length === 1 && _typeof(args[0]) === 'object') {
+      instantSearchInstance.sendEventToInsights(args[0]);
+    } else if (eventType === 'click' && (args.length === 2 || args.length === 3)) {
+      if (!(0, _isFacetRefined.default)(helper, attribute, facetValue)) {
+        // send event only when the facet is being checked "ON"
+        instantSearchInstance.sendEventToInsights({
+          insightsMethod: 'clickedFilters',
+          widgetType: widgetType,
+          eventType: eventType,
+          payload: {
+            eventName: eventName,
+            index: helper.getIndex(),
+            filters: ["".concat(attribute, ":").concat(JSON.stringify(facetValue))]
+          }
+        });
+      }
+    } else if ("development" === 'development') {
+      throw new Error("You need to pass two arguments like:\n  sendEvent('click', facetValue);\n\nIf you want to send a custom payload, you can pass one object: sendEvent(customPayload);\n");
+    }
+  };
+
+  return sendEventForFacet;
+}
+},{"./isFacetRefined":"node_modules/instantsearch.js/es/lib/utils/isFacetRefined.js"}],"node_modules/instantsearch.js/es/lib/utils/createSendEventForHits.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.createSendEventForHits = createSendEventForHits;
+exports.createBindEventForHits = createBindEventForHits;
+
+function _typeof(obj) {
+  if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") {
+    _typeof = function _typeof(obj) {
+      return typeof obj;
+    };
+  } else {
+    _typeof = function _typeof(obj) {
+      return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj;
+    };
+  }
+
+  return _typeof(obj);
+}
+
+var buildPayload = function buildPayload(_ref) {
+  var index = _ref.index,
+      widgetType = _ref.widgetType,
+      methodName = _ref.methodName,
+      args = _ref.args;
+
+  if (args.length === 1 && _typeof(args[0]) === 'object') {
+    return args[0];
+  }
+
+  var eventType = args[0];
+  var hits = args[1];
+  var eventName = args[2];
+
+  if (!hits) {
+    if ("development" === 'development') {
+      throw new Error("You need to pass hit or hits as the second argument like:\n  ".concat(methodName, "(eventType, hit);\n  "));
+    } else {
+      return null;
+    }
+  }
+
+  if ((eventType === 'click' || eventType === 'conversion') && !eventName) {
+    if ("development" === 'development') {
+      throw new Error("You need to pass eventName as the third argument for 'click' or 'conversion' events like:\n  ".concat(methodName, "('click', hit, 'Product Purchased');\n\n  To learn more about event naming: https://www.algolia.com/doc/guides/getting-insights-and-analytics/search-analytics/click-through-and-conversions/in-depth/clicks-conversions-best-practices/\n  "));
+    } else {
+      return null;
+    }
+  }
+
+  var hitsArray = Array.isArray(hits) ? hits : [hits];
+
+  if (hitsArray.length === 0) {
+    return null;
+  }
+
+  var queryID = hitsArray[0].__queryID;
+  var objectIDs = hitsArray.map(function (hit) {
+    return hit.objectID;
+  });
+  var positions = hitsArray.map(function (hit) {
+    return hit.__position;
+  });
+
+  if (eventType === 'view') {
+    return {
+      insightsMethod: 'viewedObjectIDs',
+      widgetType: widgetType,
+      eventType: eventType,
+      payload: {
+        eventName: eventName || 'Hits Viewed',
+        index: index,
+        objectIDs: objectIDs
+      }
+    };
+  } else if (eventType === 'click') {
+    return {
+      insightsMethod: 'clickedObjectIDsAfterSearch',
+      widgetType: widgetType,
+      eventType: eventType,
+      payload: {
+        eventName: eventName,
+        index: index,
+        queryID: queryID,
+        objectIDs: objectIDs,
+        positions: positions
+      }
+    };
+  } else if (eventType === 'conversion') {
+    return {
+      insightsMethod: 'convertedObjectIDsAfterSearch',
+      widgetType: widgetType,
+      eventType: eventType,
+      payload: {
+        eventName: eventName,
+        index: index,
+        queryID: queryID,
+        objectIDs: objectIDs
+      }
+    };
+  } else if ("development" === 'development') {
+    throw new Error("eventType(\"".concat(eventType, "\") is not supported.\n    If you want to send a custom payload, you can pass one object: ").concat(methodName, "(customPayload);\n    "));
+  } else {
+    return null;
+  }
+};
+
+function createSendEventForHits(_ref2) {
+  var instantSearchInstance = _ref2.instantSearchInstance,
+      index = _ref2.index,
+      widgetType = _ref2.widgetType;
+
+  var sendEventForHits = function sendEventForHits() {
+    for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
+      args[_key] = arguments[_key];
+    }
+
+    var payload = buildPayload({
+      widgetType: widgetType,
+      index: index,
+      methodName: 'sendEvent',
+      args: args
+    });
+
+    if (payload) {
+      instantSearchInstance.sendEventToInsights(payload);
+    }
+  };
+
+  return sendEventForHits;
+}
+
+function createBindEventForHits(_ref3) {
+  var index = _ref3.index,
+      widgetType = _ref3.widgetType;
+
+  var bindEventForHits = function bindEventForHits() {
+    for (var _len2 = arguments.length, args = new Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
+      args[_key2] = arguments[_key2];
+    }
+
+    var payload = buildPayload({
+      widgetType: widgetType,
+      index: index,
+      methodName: 'bindEvent',
+      args: args
+    });
+    return payload ? "data-insights-event=".concat(btoa(JSON.stringify(payload))) : '';
+  };
+
+  return bindEventForHits;
+}
+},{}],"node_modules/instantsearch.js/es/lib/utils/getAppIdAndApiKey.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.getAppIdAndApiKey = getAppIdAndApiKey;
+
+function getAppIdAndApiKey(searchClient) {
+  if (searchClient.transporter) {
+    // searchClient v4
+    var _searchClient$transpo = searchClient.transporter,
+        headers = _searchClient$transpo.headers,
+        queryParameters = _searchClient$transpo.queryParameters;
+    var APP_ID = 'x-algolia-application-id';
+    var API_KEY = 'x-algolia-api-key';
+    var appId = headers[APP_ID] || queryParameters[APP_ID];
+    var apiKey = headers[API_KEY] || queryParameters[API_KEY];
+    return [appId, apiKey];
+  } else {
+    // searchClient v3
+    return [searchClient.applicationID, searchClient.apiKey];
+  }
+}
+},{}],"node_modules/instantsearch.js/es/lib/utils/convertNumericRefinementsToFilters.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.convertNumericRefinementsToFilters = convertNumericRefinementsToFilters;
+
+function convertNumericRefinementsToFilters(state, attribute) {
+  if (!state) {
+    return null;
+  }
+
+  var filtersObj = state.numericRefinements[attribute];
+  /*
+    filtersObj === {
+      "<=": [10],
+      "=": [],
+      ">=": [5]
+    }
+  */
+
+  var filters = [];
+  Object.keys(filtersObj).filter(function (operator) {
+    return Array.isArray(filtersObj[operator]) && filtersObj[operator].length > 0;
+  }).forEach(function (operator) {
+    filtersObj[operator].forEach(function (value) {
+      filters.push("".concat(attribute).concat(operator).concat(value));
+    });
+  });
+  return filters;
+}
 },{}],"node_modules/instantsearch.js/es/lib/utils/index.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
+var _exportNames = {
+  capitalize: true,
+  defer: true,
+  isDomElement: true,
+  getContainerNode: true,
+  isSpecialClick: true,
+  prepareTemplateProps: true,
+  renderTemplate: true,
+  getRefinements: true,
+  clearRefinements: true,
+  escapeRefinement: true,
+  unescapeRefinement: true,
+  checkRendering: true,
+  checkIndexUiState: true,
+  getPropertyByPath: true,
+  getObjectType: true,
+  noop: true,
+  isFiniteNumber: true,
+  isPlainObject: true,
+  uniq: true,
+  range: true,
+  isEqual: true,
+  escape: true,
+  find: true,
+  findIndex: true,
+  mergeSearchParameters: true,
+  resolveSearchParameters: true,
+  toArray: true,
+  warning: true,
+  deprecate: true,
+  createDocumentationLink: true,
+  createDocumentationMessageGenerator: true,
+  aroundLatLngToPosition: true,
+  insideBoundingBoxToBoundingBox: true,
+  addAbsolutePosition: true,
+  addQueryID: true,
+  isFacetRefined: true,
+  getAppIdAndApiKey: true,
+  convertNumericRefinementsToFilters: true
+};
 Object.defineProperty(exports, "capitalize", {
   enumerable: true,
   get: function () {
@@ -14575,10 +15207,22 @@ Object.defineProperty(exports, "checkRendering", {
     return _checkRendering.default;
   }
 });
+Object.defineProperty(exports, "checkIndexUiState", {
+  enumerable: true,
+  get: function () {
+    return _checkIndexUiState.checkIndexUiState;
+  }
+});
 Object.defineProperty(exports, "getPropertyByPath", {
   enumerable: true,
   get: function () {
     return _getPropertyByPath.default;
+  }
+});
+Object.defineProperty(exports, "getObjectType", {
+  enumerable: true,
+  get: function () {
+    return _getObjectType.default;
   }
 });
 Object.defineProperty(exports, "noop", {
@@ -14647,6 +15291,12 @@ Object.defineProperty(exports, "resolveSearchParameters", {
     return _resolveSearchParameters.default;
   }
 });
+Object.defineProperty(exports, "toArray", {
+  enumerable: true,
+  get: function () {
+    return _toArray.default;
+  }
+});
 Object.defineProperty(exports, "warning", {
   enumerable: true,
   get: function () {
@@ -14695,6 +15345,24 @@ Object.defineProperty(exports, "addQueryID", {
     return _hitsQueryId.addQueryID;
   }
 });
+Object.defineProperty(exports, "isFacetRefined", {
+  enumerable: true,
+  get: function () {
+    return _isFacetRefined.default;
+  }
+});
+Object.defineProperty(exports, "getAppIdAndApiKey", {
+  enumerable: true,
+  get: function () {
+    return _getAppIdAndApiKey.getAppIdAndApiKey;
+  }
+});
+Object.defineProperty(exports, "convertNumericRefinementsToFilters", {
+  enumerable: true,
+  get: function () {
+    return _convertNumericRefinementsToFilters.convertNumericRefinementsToFilters;
+  }
+});
 
 var _capitalize = _interopRequireDefault(require("./capitalize"));
 
@@ -14720,7 +15388,11 @@ var _unescapeRefinement = _interopRequireDefault(require("./unescapeRefinement")
 
 var _checkRendering = _interopRequireDefault(require("./checkRendering"));
 
+var _checkIndexUiState = require("./checkIndexUiState");
+
 var _getPropertyByPath = _interopRequireDefault(require("./getPropertyByPath"));
+
+var _getObjectType = _interopRequireDefault(require("./getObjectType"));
 
 var _noop = _interopRequireDefault(require("./noop"));
 
@@ -14744,6 +15416,8 @@ var _mergeSearchParameters = _interopRequireDefault(require("./mergeSearchParame
 
 var _resolveSearchParameters = _interopRequireDefault(require("./resolveSearchParameters"));
 
+var _toArray = _interopRequireDefault(require("./toArray"));
+
 var _logger = require("./logger");
 
 var _documentation = require("./documentation");
@@ -14754,13 +15428,48 @@ var _hitsAbsolutePosition = require("./hits-absolute-position");
 
 var _hitsQueryId = require("./hits-query-id");
 
+var _isFacetRefined = _interopRequireDefault(require("./isFacetRefined"));
+
+var _createSendEventForFacet = require("./createSendEventForFacet");
+
+Object.keys(_createSendEventForFacet).forEach(function (key) {
+  if (key === "default" || key === "__esModule") return;
+  if (Object.prototype.hasOwnProperty.call(_exportNames, key)) return;
+  if (key in exports && exports[key] === _createSendEventForFacet[key]) return;
+  Object.defineProperty(exports, key, {
+    enumerable: true,
+    get: function () {
+      return _createSendEventForFacet[key];
+    }
+  });
+});
+
+var _createSendEventForHits = require("./createSendEventForHits");
+
+Object.keys(_createSendEventForHits).forEach(function (key) {
+  if (key === "default" || key === "__esModule") return;
+  if (Object.prototype.hasOwnProperty.call(_exportNames, key)) return;
+  if (key in exports && exports[key] === _createSendEventForHits[key]) return;
+  Object.defineProperty(exports, key, {
+    enumerable: true,
+    get: function () {
+      return _createSendEventForHits[key];
+    }
+  });
+});
+
+var _getAppIdAndApiKey = require("./getAppIdAndApiKey");
+
+var _convertNumericRefinementsToFilters = require("./convertNumericRefinementsToFilters");
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-},{"./capitalize":"node_modules/instantsearch.js/es/lib/utils/capitalize.js","./defer":"node_modules/instantsearch.js/es/lib/utils/defer.js","./isDomElement":"node_modules/instantsearch.js/es/lib/utils/isDomElement.js","./getContainerNode":"node_modules/instantsearch.js/es/lib/utils/getContainerNode.js","./isSpecialClick":"node_modules/instantsearch.js/es/lib/utils/isSpecialClick.js","./prepareTemplateProps":"node_modules/instantsearch.js/es/lib/utils/prepareTemplateProps.js","./renderTemplate":"node_modules/instantsearch.js/es/lib/utils/renderTemplate.js","./getRefinements":"node_modules/instantsearch.js/es/lib/utils/getRefinements.js","./clearRefinements":"node_modules/instantsearch.js/es/lib/utils/clearRefinements.js","./escapeRefinement":"node_modules/instantsearch.js/es/lib/utils/escapeRefinement.js","./unescapeRefinement":"node_modules/instantsearch.js/es/lib/utils/unescapeRefinement.js","./checkRendering":"node_modules/instantsearch.js/es/lib/utils/checkRendering.js","./getPropertyByPath":"node_modules/instantsearch.js/es/lib/utils/getPropertyByPath.js","./noop":"node_modules/instantsearch.js/es/lib/utils/noop.js","./isFiniteNumber":"node_modules/instantsearch.js/es/lib/utils/isFiniteNumber.js","./isPlainObject":"node_modules/instantsearch.js/es/lib/utils/isPlainObject.js","./uniq":"node_modules/instantsearch.js/es/lib/utils/uniq.js","./range":"node_modules/instantsearch.js/es/lib/utils/range.js","./isEqual":"node_modules/instantsearch.js/es/lib/utils/isEqual.js","./escape":"node_modules/instantsearch.js/es/lib/utils/escape.js","./find":"node_modules/instantsearch.js/es/lib/utils/find.js","./findIndex":"node_modules/instantsearch.js/es/lib/utils/findIndex.js","./mergeSearchParameters":"node_modules/instantsearch.js/es/lib/utils/mergeSearchParameters.js","./resolveSearchParameters":"node_modules/instantsearch.js/es/lib/utils/resolveSearchParameters.js","./logger":"node_modules/instantsearch.js/es/lib/utils/logger.js","./documentation":"node_modules/instantsearch.js/es/lib/utils/documentation.js","./geo-search":"node_modules/instantsearch.js/es/lib/utils/geo-search.js","./hits-absolute-position":"node_modules/instantsearch.js/es/lib/utils/hits-absolute-position.js","./hits-query-id":"node_modules/instantsearch.js/es/lib/utils/hits-query-id.js"}],"node_modules/instantsearch.js/es/widgets/index/index.js":[function(require,module,exports) {
+},{"./capitalize":"node_modules/instantsearch.js/es/lib/utils/capitalize.js","./defer":"node_modules/instantsearch.js/es/lib/utils/defer.js","./isDomElement":"node_modules/instantsearch.js/es/lib/utils/isDomElement.js","./getContainerNode":"node_modules/instantsearch.js/es/lib/utils/getContainerNode.js","./isSpecialClick":"node_modules/instantsearch.js/es/lib/utils/isSpecialClick.js","./prepareTemplateProps":"node_modules/instantsearch.js/es/lib/utils/prepareTemplateProps.js","./renderTemplate":"node_modules/instantsearch.js/es/lib/utils/renderTemplate.js","./getRefinements":"node_modules/instantsearch.js/es/lib/utils/getRefinements.js","./clearRefinements":"node_modules/instantsearch.js/es/lib/utils/clearRefinements.js","./escapeRefinement":"node_modules/instantsearch.js/es/lib/utils/escapeRefinement.js","./unescapeRefinement":"node_modules/instantsearch.js/es/lib/utils/unescapeRefinement.js","./checkRendering":"node_modules/instantsearch.js/es/lib/utils/checkRendering.js","./checkIndexUiState":"node_modules/instantsearch.js/es/lib/utils/checkIndexUiState.js","./getPropertyByPath":"node_modules/instantsearch.js/es/lib/utils/getPropertyByPath.js","./getObjectType":"node_modules/instantsearch.js/es/lib/utils/getObjectType.js","./noop":"node_modules/instantsearch.js/es/lib/utils/noop.js","./isFiniteNumber":"node_modules/instantsearch.js/es/lib/utils/isFiniteNumber.js","./isPlainObject":"node_modules/instantsearch.js/es/lib/utils/isPlainObject.js","./uniq":"node_modules/instantsearch.js/es/lib/utils/uniq.js","./range":"node_modules/instantsearch.js/es/lib/utils/range.js","./isEqual":"node_modules/instantsearch.js/es/lib/utils/isEqual.js","./escape":"node_modules/instantsearch.js/es/lib/utils/escape.js","./find":"node_modules/instantsearch.js/es/lib/utils/find.js","./findIndex":"node_modules/instantsearch.js/es/lib/utils/findIndex.js","./mergeSearchParameters":"node_modules/instantsearch.js/es/lib/utils/mergeSearchParameters.js","./resolveSearchParameters":"node_modules/instantsearch.js/es/lib/utils/resolveSearchParameters.js","./toArray":"node_modules/instantsearch.js/es/lib/utils/toArray.js","./logger":"node_modules/instantsearch.js/es/lib/utils/logger.js","./documentation":"node_modules/instantsearch.js/es/lib/utils/documentation.js","./geo-search":"node_modules/instantsearch.js/es/lib/utils/geo-search.js","./hits-absolute-position":"node_modules/instantsearch.js/es/lib/utils/hits-absolute-position.js","./hits-query-id":"node_modules/instantsearch.js/es/lib/utils/hits-query-id.js","./isFacetRefined":"node_modules/instantsearch.js/es/lib/utils/isFacetRefined.js","./createSendEventForFacet":"node_modules/instantsearch.js/es/lib/utils/createSendEventForFacet.js","./createSendEventForHits":"node_modules/instantsearch.js/es/lib/utils/createSendEventForHits.js","./getAppIdAndApiKey":"node_modules/instantsearch.js/es/lib/utils/getAppIdAndApiKey.js","./convertNumericRefinementsToFilters":"node_modules/instantsearch.js/es/lib/utils/convertNumericRefinementsToFilters.js"}],"node_modules/instantsearch.js/es/widgets/index/index.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
+exports.isIndexWidget = isIndexWidget;
 exports.default = void 0;
 
 var _algoliasearchHelper = _interopRequireDefault(require("algoliasearch-helper"));
@@ -14788,61 +15497,19 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
   }
 
   return target;
-}
-
-function _slicedToArray(arr, i) {
-  return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _nonIterableRest();
-}
-
-function _nonIterableRest() {
-  throw new TypeError("Invalid attempt to destructure non-iterable instance");
-}
-
-function _iterableToArrayLimit(arr, i) {
-  if (!(Symbol.iterator in Object(arr) || Object.prototype.toString.call(arr) === "[object Arguments]")) {
-    return;
-  }
-
-  var _arr = [];
-  var _n = true;
-  var _d = false;
-  var _e = undefined;
-
-  try {
-    for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) {
-      _arr.push(_s.value);
-
-      if (i && _arr.length === i) break;
-    }
-  } catch (err) {
-    _d = true;
-    _e = err;
-  } finally {
-    try {
-      if (!_n && _i["return"] != null) _i["return"]();
-    } finally {
-      if (_d) throw _e;
-    }
-  }
-
-  return _arr;
-}
-
-function _arrayWithHoles(arr) {
-  if (Array.isArray(arr)) return arr;
 }
 
 function _defineProperty(obj, key, value) {
@@ -14919,23 +15586,50 @@ function _objectWithoutPropertiesLoose(source, excluded) {
 }
 
 var withUsage = (0, _utils.createDocumentationMessageGenerator)({
-  name: 'index'
+  name: 'index-widget'
 });
 
 function isIndexWidget(widget) {
   return widget.$$type === 'ais.index';
 }
+/**
+ * This is the same content as helper._change / setState, but allowing for extra
+ * UiState to be synchronized.
+ * see: https://github.com/algolia/algoliasearch-helper-js/blob/6b835ffd07742f2d6b314022cce6848f5cfecd4a/src/algoliasearch.helper.js#L1311-L1324
+ */
+
+
+function privateHelperSetState(helper, _ref) {
+  var state = _ref.state,
+      isPageReset = _ref.isPageReset,
+      _uiState = _ref._uiState;
+
+  if (state !== helper.state) {
+    helper.state = state;
+    helper.emit('change', {
+      state: helper.state,
+      results: helper.lastResults,
+      isPageReset: isPageReset,
+      _uiState: _uiState
+    });
+  }
+}
 
 function getLocalWidgetsState(widgets, widgetStateOptions) {
+  var initialUiState = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
   return widgets.filter(function (widget) {
     return !isIndexWidget(widget);
   }).reduce(function (uiState, widget) {
-    if (!widget.getWidgetState) {
+    if (!widget.getWidgetUiState && !widget.getWidgetState) {
       return uiState;
     }
 
+    if (widget.getWidgetUiState) {
+      return widget.getWidgetUiState(uiState, widgetStateOptions);
+    }
+
     return widget.getWidgetState(uiState, widgetStateOptions);
-  }, {});
+  }, initialUiState);
 }
 
 function getLocalWidgetsSearchParameters(widgets, widgetSearchParametersOptions) {
@@ -14961,9 +15655,12 @@ function resetPageFromWidgets(widgets) {
   }
 
   indexWidgets.forEach(function (widget) {
-    var widgetHelper = widget.getHelper(); // @ts-ignore @TODO: remove "ts-ignore" once `resetPage()` is typed in the helper
-
-    widgetHelper.setState(widgetHelper.state.resetPage());
+    var widgetHelper = widget.getHelper();
+    privateHelperSetState(widgetHelper, {
+      // @ts-ignore @TODO: remove "ts-ignore" once `resetPage()` is typed in the helper
+      state: widgetHelper.state.resetPage(),
+      isPageReset: true
+    });
     resetPageFromWidgets(widget.getWidgets());
   });
 }
@@ -15044,20 +15741,54 @@ var index = function index(props) {
       localWidgets = localWidgets.concat(widgets);
 
       if (localInstantSearchInstance && Boolean(widgets.length)) {
-        helper.setState(getLocalWidgetsSearchParameters(localWidgets, {
-          uiState: localUiState,
-          initialSearchParameters: helper.state
-        }));
+        privateHelperSetState(helper, {
+          state: getLocalWidgetsSearchParameters(localWidgets, {
+            uiState: localUiState,
+            initialSearchParameters: helper.state
+          }),
+          _uiState: localUiState
+        }); // We compute the render state before calling `init` in a separate loop
+        // to construct the whole render state object that is then passed to
+        // `init`.
+
         widgets.forEach(function (widget) {
-          if (localInstantSearchInstance && widget.init) {
+          if (widget.getRenderState) {
+            var renderState = widget.getRenderState(localInstantSearchInstance.renderState[_this.getIndexId()] || {}, {
+              uiState: localInstantSearchInstance._initialUiState,
+              helper: _this.getHelper(),
+              parent: _this,
+              instantSearchInstance: localInstantSearchInstance,
+              state: helper.state,
+              renderState: localInstantSearchInstance.renderState,
+              templatesConfig: localInstantSearchInstance.templatesConfig,
+              createURL: createURL,
+              scopedResults: [],
+              searchMetadata: {
+                isSearchStalled: localInstantSearchInstance._isSearchStalled
+              }
+            });
+            storeRenderState({
+              renderState: renderState,
+              instantSearchInstance: localInstantSearchInstance,
+              parent: _this
+            });
+          }
+        });
+        widgets.forEach(function (widget) {
+          if (widget.init) {
             widget.init({
               helper: helper,
               parent: _this,
-              uiState: {},
+              uiState: localInstantSearchInstance._initialUiState,
               instantSearchInstance: localInstantSearchInstance,
               state: helper.state,
+              renderState: localInstantSearchInstance.renderState,
               templatesConfig: localInstantSearchInstance.templatesConfig,
-              createURL: createURL
+              createURL: createURL,
+              scopedResults: [],
+              searchMetadata: {
+                isSearchStalled: localInstantSearchInstance._isSearchStalled
+              }
             });
           }
         });
@@ -15106,12 +15837,12 @@ var index = function index(props) {
 
       return this;
     },
-    init: function init(_ref) {
+    init: function init(_ref2) {
       var _this2 = this;
 
-      var instantSearchInstance = _ref.instantSearchInstance,
-          parent = _ref.parent,
-          uiState = _ref.uiState;
+      var instantSearchInstance = _ref2.instantSearchInstance,
+          parent = _ref2.parent,
+          uiState = _ref2.uiState;
       localInstantSearchInstance = instantSearchInstance;
       localParent = parent;
       localUiState = uiState[indexId] || {}; // The `mainHelper` is already defined at this point. The instance is created
@@ -15133,6 +15864,20 @@ var index = function index(props) {
       // aware of the `searchClient`).
 
       helper.search = function () {
+        if (instantSearchInstance.onStateChange) {
+          instantSearchInstance.onStateChange({
+            uiState: instantSearchInstance.mainIndex.getWidgetUiState({}),
+            setUiState: instantSearchInstance.setUiState.bind(instantSearchInstance)
+          }); // We don't trigger a search when controlled because it becomes the
+          // responsibility of `setUiState`.
+
+          return mainHelper;
+        }
+
+        return mainHelper.search();
+      };
+
+      helper.searchWithoutTriggeringOnStateChange = function () {
         return mainHelper.search();
       }; // We use the same pattern for the `searchForFacetValues`.
 
@@ -15149,8 +15894,8 @@ var index = function index(props) {
       // It makes sense to replicate it at the `init` step. We have another
       // listener on `change` below, once `init` is done.
 
-      helper.on('change', function (_ref2) {
-        var isPageReset = _ref2.isPageReset;
+      helper.on('change', function (_ref3) {
+        var isPageReset = _ref3.isPageReset;
 
         if (isPageReset) {
           resetPageFromWidgets(localWidgets);
@@ -15164,87 +15909,14 @@ var index = function index(props) {
         instantSearchInstance.scheduleStalledRender();
 
         if ("development" === 'development') {
-          // Some connectors are responsible for multiple widgets so we need
-          // to map them.
-          // eslint-disable-next-line no-inner-declarations
-          var getWidgetNames = function getWidgetNames(connectorName) {
-            switch (connectorName) {
-              case 'range':
-                return ['rangeInput', 'rangeSlider'];
-
-              case 'menu':
-                return ['menu', 'menuSelect'];
-
-              default:
-                return [connectorName];
-            }
-          };
-
-          var stateToWidgetsMap = {
-            query: ['ais.searchBox', 'ais.autocomplete', 'ais.voiceSearch'],
-            refinementList: ['ais.refinementList'],
-            menu: ['ais.menu'],
-            hierarchicalMenu: ['ais.hierarchicalMenu'],
-            numericMenu: ['ais.numericMenu'],
-            ratingMenu: ['ais.ratingMenu'],
-            range: ['ais.range'],
-            toggle: ['ais.toggleRefinement'],
-            geoSearch: ['ais.geoSearch'],
-            sortBy: ['ais.sortBy'],
-            page: ['ais.pagination', 'ais.infiniteHits'],
-            hitsPerPage: ['ais.hitsPerPage'],
-            configure: ['ais.configure'],
-            places: ['ais.places']
-          };
-
-          var mountedWidgets = _this2.getWidgets().map(function (widget) {
-            return widget.$$type;
-          }).filter(Boolean);
-
-          var missingWidgets = Object.keys(localUiState).reduce(function (acc, parameter) {
-            var requiredWidgets = stateToWidgetsMap[parameter];
-
-            if (requiredWidgets && !requiredWidgets.some(function (requiredWidget) {
-              return mountedWidgets.includes(requiredWidget);
-            })) {
-              acc.push([parameter, stateToWidgetsMap[parameter].map(function (widgetIdentifier) {
-                return widgetIdentifier.split('ais.')[1];
-              })]);
-            }
-
-            return acc;
-          }, []);
-          "development" === 'development' ? (0, _utils.warning)(missingWidgets.length === 0, "The UI state for the index \"".concat(_this2.getIndexId(), "\" is not consistent with the widgets mounted.\n\nThis can happen when the UI state is specified via `initialUiState` or `routing` but that the widgets responsible for this state were not added. This results in those query parameters not being sent to the API.\n\nTo fully reflect the state, some widgets need to be added to the index \"").concat(_this2.getIndexId(), "\":\n\n").concat(missingWidgets.map(function (_ref3) {
-            var _ref5;
-
-            var _ref4 = _slicedToArray(_ref3, 2),
-                stateParameter = _ref4[0],
-                widgets = _ref4[1];
-
-            return "- `".concat(stateParameter, "` needs one of these widgets: ").concat((_ref5 = []).concat.apply(_ref5, _toConsumableArray(widgets.map(function (name) {
-              return getWidgetNames(name);
-            }))).map(function (name) {
-              return "\"".concat(name, "\"");
-            }).join(', '));
-          }).join('\n'), "\n\nIf you do not wish to display widgets but still want to support their search parameters, you can mount \"virtual widgets\" that don't render anything:\n\n```\n").concat(missingWidgets.map(function (_ref6) {
-            var _ref7 = _slicedToArray(_ref6, 2),
-                _stateParameter = _ref7[0],
-                widgets = _ref7[1];
-
-            var capitalizedWidget = (0, _utils.capitalize)(widgets[0]);
-            return "const virtual".concat(capitalizedWidget, " = connect").concat(capitalizedWidget, "(() => null);");
-          }).join('\n'), "\n\nsearch.addWidgets([\n  ").concat(missingWidgets.map(function (_ref8) {
-            var _ref9 = _slicedToArray(_ref8, 2),
-                _stateParameter = _ref9[0],
-                widgets = _ref9[1];
-
-            var capitalizedWidget = (0, _utils.capitalize)(widgets[0]);
-            return "virtual".concat(capitalizedWidget, "({ /* ... */ })");
-          }).join(',\n  '), "\n]);\n```\n\nIf you're using custom widgets that do set these query parameters, we recommend using connectors instead.\n\nSee https://www.algolia.com/doc/guides/building-search-ui/widgets/customize-an-existing-widget/js/#customize-the-complete-ui-of-the-widgets")) : void 0;
+          (0, _utils.checkIndexUiState)({
+            index: _this2,
+            indexUiState: localUiState
+          });
         }
       });
-      derivedHelper.on('result', function (_ref10) {
-        var results = _ref10.results; // The index does not render the results it schedules a new render
+      derivedHelper.on('result', function (_ref4) {
+        var results = _ref4.results; // The index does not render the results it schedules a new render
         // to let all the other indices emit their own results. It allows us to
         // run the render process in one pass.
 
@@ -15254,8 +15926,36 @@ var index = function index(props) {
         // search behavior.
 
         helper.lastResults = results;
+      }); // We compute the render state before calling `render` in a separate loop
+      // to construct the whole render state object that is then passed to
+      // `render`.
+
+      localWidgets.forEach(function (widget) {
+        if (widget.getRenderState) {
+          var renderState = widget.getRenderState(instantSearchInstance.renderState[_this2.getIndexId()] || {}, {
+            uiState: uiState,
+            helper: helper,
+            parent: _this2,
+            instantSearchInstance: instantSearchInstance,
+            state: helper.state,
+            renderState: instantSearchInstance.renderState,
+            templatesConfig: instantSearchInstance.templatesConfig,
+            createURL: createURL,
+            scopedResults: [],
+            searchMetadata: {
+              isSearchStalled: instantSearchInstance._isSearchStalled
+            }
+          });
+          storeRenderState({
+            renderState: renderState,
+            instantSearchInstance: instantSearchInstance,
+            parent: _this2
+          });
+        }
       });
       localWidgets.forEach(function (widget) {
+        "development" === 'development' ? (0, _utils.warning)(!widget.getWidgetState, 'The `getWidgetState` method is renamed `getWidgetUiState` and will no longer exist under that name in InstantSearch.js 5.x. Please use `getWidgetUiState` instead.') : void 0;
+
         if (widget.init) {
           widget.init({
             uiState: uiState,
@@ -15263,8 +15963,13 @@ var index = function index(props) {
             parent: _this2,
             instantSearchInstance: instantSearchInstance,
             state: helper.state,
+            renderState: instantSearchInstance.renderState,
             templatesConfig: instantSearchInstance.templatesConfig,
-            createURL: createURL
+            createURL: createURL,
+            scopedResults: [],
+            searchMetadata: {
+              isSearchStalled: instantSearchInstance._isSearchStalled
+            }
           });
         }
       }); // Subscribe to the Helper state changes for the `uiState` once widgets
@@ -15274,19 +15979,53 @@ var index = function index(props) {
       // configuration of the widget is pushed in the URL. That's what we want to avoid.
       // https://github.com/algolia/instantsearch.js/pull/994/commits/4a672ae3fd78809e213de0368549ef12e9dc9454
 
-      helper.on('change', function (_ref11) {
-        var state = _ref11.state;
+      helper.on('change', function (event) {
+        var state = event.state; // @ts-ignore _uiState comes from privateHelperSetState and thus isn't typed on the helper event
+
+        var _uiState = event._uiState;
         localUiState = getLocalWidgetsState(localWidgets, {
           searchParameters: state,
           helper: helper
-        });
-        instantSearchInstance.onStateChange();
+        }, _uiState || {}); // We don't trigger an internal change when controlled because it
+        // becomes the responsibility of `setUiState`.
+
+        if (!instantSearchInstance.onStateChange) {
+          instantSearchInstance.onInternalStateChange();
+        }
       });
     },
-    render: function render(_ref12) {
+    render: function render(_ref5) {
       var _this3 = this;
 
-      var instantSearchInstance = _ref12.instantSearchInstance;
+      var instantSearchInstance = _ref5.instantSearchInstance;
+
+      if (!this.getResults()) {
+        return;
+      }
+
+      localWidgets.forEach(function (widget) {
+        if (widget.getRenderState) {
+          var renderState = widget.getRenderState(instantSearchInstance.renderState[_this3.getIndexId()] || {}, {
+            helper: _this3.getHelper(),
+            parent: _this3,
+            instantSearchInstance: instantSearchInstance,
+            results: _this3.getResults(),
+            scopedResults: resolveScopedResultsFromIndex(_this3),
+            state: _this3.getResults()._state,
+            renderState: instantSearchInstance.renderState,
+            templatesConfig: instantSearchInstance.templatesConfig,
+            createURL: createURL,
+            searchMetadata: {
+              isSearchStalled: instantSearchInstance._isSearchStalled
+            }
+          });
+          storeRenderState({
+            renderState: renderState,
+            instantSearchInstance: instantSearchInstance,
+            parent: _this3
+          });
+        }
+      });
       localWidgets.forEach(function (widget) {
         // At this point, all the variables used below are set. Both `helper`
         // and `derivedHelper` have been created at the `init` step. The attribute
@@ -15294,13 +16033,15 @@ var index = function index(props) {
         // happens before the result e.g with a dynamically added index the request might
         // be delayed. The render is triggered for the complete tree but some parts do
         // not have results yet.
-        if (widget.render && derivedHelper.lastResults) {
+        if (widget.render) {
           widget.render({
             helper: helper,
+            parent: _this3,
             instantSearchInstance: instantSearchInstance,
-            results: derivedHelper.lastResults,
+            results: _this3.getResults(),
             scopedResults: resolveScopedResultsFromIndex(_this3),
-            state: derivedHelper.lastResults._state,
+            state: _this3.getResults()._state,
+            renderState: instantSearchInstance.renderState,
             templatesConfig: instantSearchInstance.templatesConfig,
             createURL: createURL,
             searchMetadata: {
@@ -15332,23 +16073,79 @@ var index = function index(props) {
       derivedHelper.detach();
       derivedHelper = null;
     },
-    getWidgetState: function getWidgetState(uiState) {
+    getWidgetUiState: function getWidgetUiState(uiState) {
       return localWidgets.filter(isIndexWidget).reduce(function (previousUiState, innerIndex) {
-        return innerIndex.getWidgetState(previousUiState);
+        return innerIndex.getWidgetUiState(previousUiState);
       }, _objectSpread({}, uiState, _defineProperty({}, this.getIndexId(), localUiState)));
+    },
+    getWidgetState: function getWidgetState(uiState) {
+      "development" === 'development' ? (0, _utils.warning)(false, 'The `getWidgetState` method is renamed `getWidgetUiState` and will no longer exist under that name in InstantSearch.js 5.x. Please use `getWidgetUiState` instead.') : void 0;
+      return this.getWidgetUiState(uiState);
+    },
+    getWidgetSearchParameters: function getWidgetSearchParameters(searchParameters, _ref6) {
+      var uiState = _ref6.uiState;
+      return getLocalWidgetsSearchParameters(localWidgets, {
+        uiState: uiState,
+        initialSearchParameters: searchParameters
+      });
+    },
+    refreshUiState: function refreshUiState() {
+      localUiState = getLocalWidgetsState(localWidgets, {
+        searchParameters: this.getHelper().state,
+        helper: this.getHelper()
+      });
     }
   };
 };
 
 var _default = index;
 exports.default = _default;
-},{"algoliasearch-helper":"node_modules/algoliasearch-helper/index.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js"}],"node_modules/instantsearch.js/es/lib/RoutingManager.js":[function(require,module,exports) {
+
+function storeRenderState(_ref7) {
+  var renderState = _ref7.renderState,
+      instantSearchInstance = _ref7.instantSearchInstance,
+      parent = _ref7.parent;
+  var parentIndexName = parent ? parent.getIndexId() : instantSearchInstance.mainIndex.getIndexId();
+  instantSearchInstance.renderState = _objectSpread({}, instantSearchInstance.renderState, _defineProperty({}, parentIndexName, _objectSpread({}, instantSearchInstance.renderState[parentIndexName], {}, renderState)));
+}
+},{"algoliasearch-helper":"node_modules/algoliasearch-helper/index.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js"}],"node_modules/instantsearch.js/es/lib/version.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
 exports.default = void 0;
+var _default = '4.9.0';
+exports.default = _default;
+},{}],"node_modules/instantsearch.js/es/lib/escape-highlight.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = escapeHits;
+exports.escapeFacets = escapeFacets;
+exports.TAG_REPLACEMENT = exports.TAG_PLACEHOLDER = void 0;
+
+var _utils = require("../lib/utils");
+
+function _extends() {
+  _extends = Object.assign || function (target) {
+    for (var i = 1; i < arguments.length; i++) {
+      var source = arguments[i];
+
+      for (var key in source) {
+        if (Object.prototype.hasOwnProperty.call(source, key)) {
+          target[key] = source[key];
+        }
+      }
+    }
+
+    return target;
+  };
+
+  return _extends.apply(this, arguments);
+}
 
 function ownKeys(object, enumerableOnly) {
   var keys = Object.keys(object);
@@ -15369,41 +16166,19 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
   }
 
   return target;
-}
-
-function _classCallCheck(instance, Constructor) {
-  if (!(instance instanceof Constructor)) {
-    throw new TypeError("Cannot call a class as a function");
-  }
-}
-
-function _defineProperties(target, props) {
-  for (var i = 0; i < props.length; i++) {
-    var descriptor = props[i];
-    descriptor.enumerable = descriptor.enumerable || false;
-    descriptor.configurable = true;
-    if ("value" in descriptor) descriptor.writable = true;
-    Object.defineProperty(target, descriptor.key, descriptor);
-  }
-}
-
-function _createClass(Constructor, protoProps, staticProps) {
-  if (protoProps) _defineProperties(Constructor.prototype, protoProps);
-  if (staticProps) _defineProperties(Constructor, staticProps);
-  return Constructor;
 }
 
 function _defineProperty(obj, key, value) {
@@ -15421,98 +16196,465 @@ function _defineProperty(obj, key, value) {
   return obj;
 }
 
-var walk = function walk(current, callback) {
-  callback(current);
-  current.getWidgets().filter(function (widget) {
-    return widget.$$type === 'ais.index';
-  }).forEach(function (innerIndex) {
-    walk(innerIndex, callback);
-  });
+var TAG_PLACEHOLDER = {
+  highlightPreTag: '__ais-highlight__',
+  highlightPostTag: '__/ais-highlight__'
 };
+exports.TAG_PLACEHOLDER = TAG_PLACEHOLDER;
+var TAG_REPLACEMENT = {
+  highlightPreTag: '<mark>',
+  highlightPostTag: '</mark>'
+};
+exports.TAG_REPLACEMENT = TAG_REPLACEMENT;
 
-var RoutingManager =
-/*#__PURE__*/
-function () {
-  function RoutingManager(_ref) {
-    var router = _ref.router,
-        stateMapping = _ref.stateMapping,
-        instantSearchInstance = _ref.instantSearchInstance;
+function replaceTagsAndEscape(value) {
+  return (0, _utils.escape)(value).replace(new RegExp(TAG_PLACEHOLDER.highlightPreTag, 'g'), TAG_REPLACEMENT.highlightPreTag).replace(new RegExp(TAG_PLACEHOLDER.highlightPostTag, 'g'), TAG_REPLACEMENT.highlightPostTag);
+}
 
-    _classCallCheck(this, RoutingManager);
-
-    _defineProperty(this, "instantSearchInstance", void 0);
-
-    _defineProperty(this, "router", void 0);
-
-    _defineProperty(this, "stateMapping", void 0);
-
-    this.router = router;
-    this.stateMapping = stateMapping;
-    this.instantSearchInstance = instantSearchInstance;
-    this.createURL = this.createURL.bind(this);
+function recursiveEscape(input) {
+  if ((0, _utils.isPlainObject)(input) && typeof input.value !== 'string') {
+    return Object.keys(input).reduce(function (acc, key) {
+      return _objectSpread({}, acc, _defineProperty({}, key, recursiveEscape(input[key])));
+    }, {});
   }
 
-  _createClass(RoutingManager, [{
-    key: "read",
-    value: function read() {
-      var route = this.router.read();
-      return this.stateMapping.routeToState(route);
+  if (Array.isArray(input)) {
+    return input.map(recursiveEscape);
+  }
+
+  return _objectSpread({}, input, {
+    value: replaceTagsAndEscape(input.value)
+  });
+}
+
+function escapeHits(hits) {
+  if (hits.__escaped === undefined) {
+    // We don't override the value on hit because it will mutate the raw results
+    // instead we make a shallow copy and we assign the escaped values on it.
+    hits = hits.map(function (_ref) {
+      var hit = _extends({}, _ref);
+
+      if (hit._highlightResult) {
+        hit._highlightResult = recursiveEscape(hit._highlightResult);
+      }
+
+      if (hit._snippetResult) {
+        hit._snippetResult = recursiveEscape(hit._snippetResult);
+      }
+
+      return hit;
+    });
+    hits.__escaped = true;
+  }
+
+  return hits;
+}
+
+function escapeFacets(facetHits) {
+  return facetHits.map(function (h) {
+    return _objectSpread({}, h, {
+      highlighted: replaceTagsAndEscape(h.highlighted)
+    });
+  });
+}
+},{"../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js"}],"node_modules/instantsearch.js/es/lib/suit.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.component = void 0;
+var NAMESPACE = 'ais';
+
+var component = function component(componentName) {
+  return function () {
+    var _ref = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {},
+        descendantName = _ref.descendantName,
+        modifierName = _ref.modifierName;
+
+    var descendent = descendantName ? "-".concat(descendantName) : '';
+    var modifier = modifierName ? "--".concat(modifierName) : '';
+    return "".concat(NAMESPACE, "-").concat(componentName).concat(descendent).concat(modifier);
+  };
+};
+
+exports.component = component;
+},{}],"node_modules/instantsearch.js/es/helpers/highlight.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = highlight;
+
+var _utils = require("../lib/utils");
+
+var _escapeHighlight = require("../lib/escape-highlight");
+
+var _suit = require("../lib/suit");
+
+var suit = (0, _suit.component)('Highlight');
+
+function highlight(_ref) {
+  var attribute = _ref.attribute,
+      _ref$highlightedTagNa = _ref.highlightedTagName,
+      highlightedTagName = _ref$highlightedTagNa === void 0 ? 'mark' : _ref$highlightedTagNa,
+      hit = _ref.hit,
+      _ref$cssClasses = _ref.cssClasses,
+      cssClasses = _ref$cssClasses === void 0 ? {} : _ref$cssClasses;
+
+  var _ref2 = (0, _utils.getPropertyByPath)(hit._highlightResult, attribute) || {},
+      _ref2$value = _ref2.value,
+      attributeValue = _ref2$value === void 0 ? '' : _ref2$value; // cx is not used, since it would be bundled as a dependency for Vue & Angular
+
+
+  var className = suit({
+    descendantName: 'highlighted'
+  }) + (cssClasses.highlighted ? " ".concat(cssClasses.highlighted) : '');
+  return attributeValue.replace(new RegExp(_escapeHighlight.TAG_REPLACEMENT.highlightPreTag, 'g'), "<".concat(highlightedTagName, " class=\"").concat(className, "\">")).replace(new RegExp(_escapeHighlight.TAG_REPLACEMENT.highlightPostTag, 'g'), "</".concat(highlightedTagName, ">"));
+}
+},{"../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js","../lib/escape-highlight":"node_modules/instantsearch.js/es/lib/escape-highlight.js","../lib/suit":"node_modules/instantsearch.js/es/lib/suit.js"}],"node_modules/instantsearch.js/es/helpers/snippet.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = snippet;
+
+var _utils = require("../lib/utils");
+
+var _escapeHighlight = require("../lib/escape-highlight");
+
+var _suit = require("../lib/suit");
+
+var suit = (0, _suit.component)('Snippet');
+
+function snippet(_ref) {
+  var attribute = _ref.attribute,
+      _ref$highlightedTagNa = _ref.highlightedTagName,
+      highlightedTagName = _ref$highlightedTagNa === void 0 ? 'mark' : _ref$highlightedTagNa,
+      hit = _ref.hit,
+      _ref$cssClasses = _ref.cssClasses,
+      cssClasses = _ref$cssClasses === void 0 ? {} : _ref$cssClasses;
+
+  var _ref2 = (0, _utils.getPropertyByPath)(hit._snippetResult, attribute) || {},
+      _ref2$value = _ref2.value,
+      attributeValue = _ref2$value === void 0 ? '' : _ref2$value; // cx is not used, since it would be bundled as a dependency for Vue & Angular
+
+
+  var className = suit({
+    descendantName: 'highlighted'
+  }) + (cssClasses.highlighted ? " ".concat(cssClasses.highlighted) : '');
+  return attributeValue.replace(new RegExp(_escapeHighlight.TAG_REPLACEMENT.highlightPreTag, 'g'), "<".concat(highlightedTagName, " class=\"").concat(className, "\">")).replace(new RegExp(_escapeHighlight.TAG_REPLACEMENT.highlightPostTag, 'g'), "</".concat(highlightedTagName, ">"));
+}
+},{"../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js","../lib/escape-highlight":"node_modules/instantsearch.js/es/lib/escape-highlight.js","../lib/suit":"node_modules/instantsearch.js/es/lib/suit.js"}],"node_modules/instantsearch.js/es/helpers/insights.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.readDataAttributes = readDataAttributes;
+exports.hasDataAttributes = hasDataAttributes;
+exports.writeDataAttributes = writeDataAttributes;
+exports.default = insights;
+
+var _utils = require("../lib/utils");
+
+function _typeof(obj) {
+  if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") {
+    _typeof = function _typeof(obj) {
+      return typeof obj;
+    };
+  } else {
+    _typeof = function _typeof(obj) {
+      return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj;
+    };
+  }
+
+  return _typeof(obj);
+}
+
+function readDataAttributes(domElement) {
+  var method = domElement.getAttribute('data-insights-method');
+  var serializedPayload = domElement.getAttribute('data-insights-payload');
+
+  if (typeof serializedPayload !== 'string') {
+    throw new Error('The insights helper expects `data-insights-payload` to be a base64-encoded JSON string.');
+  }
+
+  try {
+    var payload = JSON.parse(atob(serializedPayload));
+    return {
+      method: method,
+      payload: payload
+    };
+  } catch (error) {
+    throw new Error('The insights helper was unable to parse `data-insights-payload`.');
+  }
+}
+
+function hasDataAttributes(domElement) {
+  return domElement.hasAttribute('data-insights-method');
+}
+
+function writeDataAttributes(_ref) {
+  var method = _ref.method,
+      payload = _ref.payload;
+
+  if (_typeof(payload) !== 'object') {
+    throw new Error("The insights helper expects the payload to be an object.");
+  }
+
+  var serializedPayload;
+
+  try {
+    serializedPayload = btoa(JSON.stringify(payload));
+  } catch (error) {
+    throw new Error("Could not JSON serialize the payload object.");
+  }
+
+  return "data-insights-method=\"".concat(method, "\" data-insights-payload=\"").concat(serializedPayload, "\"");
+}
+/**
+ * @deprecated This function will be still supported in 4.x releases, but not further. It is replaced by the `insights` middleware. For more information, visit https://www.algolia.com/doc/guides/getting-insights-and-analytics/search-analytics/click-through-and-conversions/how-to/send-click-and-conversion-events-with-instantsearch/js/
+ */
+
+
+function insights(method, payload) {
+  "development" === 'development' ? (0, _utils.warning)(false, "`insights` function has been deprecated. It is still supported in 4.x releases, but not further. It is replaced by the `insights` middleware.\n\nFor more information, visit https://www.algolia.com/doc/guides/getting-insights-and-analytics/search-analytics/click-through-and-conversions/how-to/send-click-and-conversion-events-with-instantsearch/js/") : void 0;
+  return writeDataAttributes({
+    method: method,
+    payload: payload
+  });
+}
+},{"../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js"}],"node_modules/instantsearch.js/es/helpers/get-insights-anonymous-user-token.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.getInsightsAnonymousUserTokenInternal = getInsightsAnonymousUserTokenInternal;
+exports.default = getInsightsAnonymousUserToken;
+exports.ANONYMOUS_TOKEN_COOKIE_KEY = void 0;
+
+var _utils = require("../lib/utils");
+
+var ANONYMOUS_TOKEN_COOKIE_KEY = '_ALGOLIA';
+exports.ANONYMOUS_TOKEN_COOKIE_KEY = ANONYMOUS_TOKEN_COOKIE_KEY;
+
+function getCookie(name) {
+  var prefix = "".concat(name, "=");
+  var cookies = document.cookie.split(';');
+
+  for (var i = 0; i < cookies.length; i++) {
+    var cookie = cookies[i];
+
+    while (cookie.charAt(0) === ' ') {
+      cookie = cookie.substring(1);
     }
-  }, {
-    key: "write",
-    value: function write(_ref2) {
-      var state = _ref2.state;
-      var route = this.stateMapping.stateToRoute(state);
-      this.router.write(route);
+
+    if (cookie.indexOf(prefix) === 0) {
+      return cookie.substring(prefix.length, cookie.length);
     }
-  }, {
-    key: "subscribe",
-    value: function subscribe() {
-      var _this = this;
+  }
 
-      this.router.onUpdate(function (route) {
-        var uiState = _this.stateMapping.routeToState(route);
+  return undefined;
+}
 
-        walk(_this.instantSearchInstance.mainIndex, function (current) {
-          var widgets = current.getWidgets();
-          var indexUiState = uiState[current.getIndexId()] || {};
-          var searchParameters = widgets.reduce(function (parameters, widget) {
-            if (!widget.getWidgetSearchParameters) {
-              return parameters;
-            }
+function getInsightsAnonymousUserTokenInternal() {
+  return getCookie(ANONYMOUS_TOKEN_COOKIE_KEY);
+}
+/**
+ * @deprecated This function will be still supported in 4.x releases, but not further. It is replaced by the `insights` middleware. For more information, visit https://www.algolia.com/doc/guides/getting-insights-and-analytics/search-analytics/click-through-and-conversions/how-to/send-click-and-conversion-events-with-instantsearch/js/
+ */
 
-            return widget.getWidgetSearchParameters(parameters, {
-              uiState: indexUiState
-            });
-          }, current.getHelper().state);
-          current.getHelper().overrideStateWithoutTriggeringChangeEvent(searchParameters);
 
-          _this.instantSearchInstance.scheduleSearch();
-        });
+function getInsightsAnonymousUserToken() {
+  "development" === 'development' ? (0, _utils.warning)(false, "`getInsightsAnonymousUserToken` function has been deprecated. It is still supported in 4.x releases, but not further. It is replaced by the `insights` middleware.\n\nFor more information, visit https://www.algolia.com/doc/guides/getting-insights-and-analytics/search-analytics/click-through-and-conversions/how-to/send-click-and-conversion-events-with-instantsearch/js/") : void 0;
+  return getInsightsAnonymousUserTokenInternal();
+}
+},{"../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js"}],"node_modules/instantsearch.js/es/helpers/index.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+var _exportNames = {
+  highlight: true,
+  snippet: true,
+  insights: true,
+  getInsightsAnonymousUserToken: true,
+  getInsightsAnonymousUserTokenInternal: true
+};
+Object.defineProperty(exports, "highlight", {
+  enumerable: true,
+  get: function () {
+    return _highlight.default;
+  }
+});
+Object.defineProperty(exports, "snippet", {
+  enumerable: true,
+  get: function () {
+    return _snippet.default;
+  }
+});
+Object.defineProperty(exports, "insights", {
+  enumerable: true,
+  get: function () {
+    return _insights.default;
+  }
+});
+Object.defineProperty(exports, "getInsightsAnonymousUserToken", {
+  enumerable: true,
+  get: function () {
+    return _getInsightsAnonymousUserToken.default;
+  }
+});
+Object.defineProperty(exports, "getInsightsAnonymousUserTokenInternal", {
+  enumerable: true,
+  get: function () {
+    return _getInsightsAnonymousUserToken.getInsightsAnonymousUserTokenInternal;
+  }
+});
+
+var _highlight = _interopRequireWildcard(require("./highlight"));
+
+Object.keys(_highlight).forEach(function (key) {
+  if (key === "default" || key === "__esModule") return;
+  if (Object.prototype.hasOwnProperty.call(_exportNames, key)) return;
+  if (key in exports && exports[key] === _highlight[key]) return;
+  Object.defineProperty(exports, key, {
+    enumerable: true,
+    get: function () {
+      return _highlight[key];
+    }
+  });
+});
+
+var _snippet = _interopRequireWildcard(require("./snippet"));
+
+Object.keys(_snippet).forEach(function (key) {
+  if (key === "default" || key === "__esModule") return;
+  if (Object.prototype.hasOwnProperty.call(_exportNames, key)) return;
+  if (key in exports && exports[key] === _snippet[key]) return;
+  Object.defineProperty(exports, key, {
+    enumerable: true,
+    get: function () {
+      return _snippet[key];
+    }
+  });
+});
+
+var _insights = _interopRequireDefault(require("./insights"));
+
+var _getInsightsAnonymousUserToken = _interopRequireWildcard(require("./get-insights-anonymous-user-token"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _getRequireWildcardCache() { if (typeof WeakMap !== "function") return null; var cache = new WeakMap(); _getRequireWildcardCache = function () { return cache; }; return cache; }
+
+function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } if (obj === null || typeof obj !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
+},{"./highlight":"node_modules/instantsearch.js/es/helpers/highlight.js","./snippet":"node_modules/instantsearch.js/es/helpers/snippet.js","./insights":"node_modules/instantsearch.js/es/helpers/insights.js","./get-insights-anonymous-user-token":"node_modules/instantsearch.js/es/helpers/get-insights-anonymous-user-token.js"}],"node_modules/instantsearch.js/es/lib/createHelpers.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = hoganHelpers;
+
+var _helpers = require("../helpers");
+
+function ownKeys(object, enumerableOnly) {
+  var keys = Object.keys(object);
+
+  if (Object.getOwnPropertySymbols) {
+    var symbols = Object.getOwnPropertySymbols(object);
+    if (enumerableOnly) symbols = symbols.filter(function (sym) {
+      return Object.getOwnPropertyDescriptor(object, sym).enumerable;
+    });
+    keys.push.apply(keys, symbols);
+  }
+
+  return keys;
+}
+
+function _objectSpread(target) {
+  for (var i = 1; i < arguments.length; i++) {
+    var source = arguments[i] != null ? arguments[i] : {};
+
+    if (i % 2) {
+      ownKeys(Object(source), true).forEach(function (key) {
+        _defineProperty(target, key, source[key]);
+      });
+    } else if (Object.getOwnPropertyDescriptors) {
+      Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
+    } else {
+      ownKeys(Object(source)).forEach(function (key) {
+        Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
-  }, {
-    key: "dispose",
-    value: function dispose() {
-      this.router.dispose();
-    }
-  }, {
-    key: "createURL",
-    value: function createURL(nextState) {
-      var uiState = Object.keys(nextState).reduce(function (acc, indexId) {
-        return _objectSpread({}, acc, _defineProperty({}, indexId, nextState[indexId]));
-      }, this.instantSearchInstance.mainIndex.getWidgetState({}));
-      var route = this.stateMapping.stateToRoute(uiState);
-      return this.router.createURL(route);
-    }
-  }]);
+  }
 
-  return RoutingManager;
-}();
+  return target;
+}
 
-var _default = RoutingManager;
-exports.default = _default;
-},{}],"node_modules/instantsearch.js/es/lib/stateMappings/simple.js":[function(require,module,exports) {
+function _defineProperty(obj, key, value) {
+  if (key in obj) {
+    Object.defineProperty(obj, key, {
+      value: value,
+      enumerable: true,
+      configurable: true,
+      writable: true
+    });
+  } else {
+    obj[key] = value;
+  }
+
+  return obj;
+}
+
+function hoganHelpers(_ref) {
+  var numberLocale = _ref.numberLocale;
+  return {
+    formatNumber: function formatNumber(value, render) {
+      return Number(render(value)).toLocaleString(numberLocale);
+    },
+    highlight: function highlight(options, render) {
+      try {
+        var highlightOptions = JSON.parse(options);
+        return render((0, _helpers.highlight)(_objectSpread({}, highlightOptions, {
+          hit: this
+        })));
+      } catch (error) {
+        throw new Error("\nThe highlight helper expects a JSON object of the format:\n{ \"attribute\": \"name\", \"highlightedTagName\": \"mark\" }");
+      }
+    },
+    snippet: function snippet(options, render) {
+      try {
+        var snippetOptions = JSON.parse(options);
+        return render((0, _helpers.snippet)(_objectSpread({}, snippetOptions, {
+          hit: this
+        })));
+      } catch (error) {
+        throw new Error("\nThe snippet helper expects a JSON object of the format:\n{ \"attribute\": \"name\", \"highlightedTagName\": \"mark\" }");
+      }
+    },
+    insights: function insights(options, render) {
+      try {
+        var _JSON$parse = JSON.parse(options),
+            method = _JSON$parse.method,
+            payload = _JSON$parse.payload;
+
+        return render((0, _helpers.insights)(method, _objectSpread({
+          objectIDs: [this.objectID]
+        }, payload)));
+      } catch (error) {
+        throw new Error("\nThe insights helper expects a JSON object of the format:\n{ \"method\": \"method-name\", \"payload\": { \"eventName\": \"name of the event\" } }");
+      }
+    }
+  };
+}
+},{"../helpers":"node_modules/instantsearch.js/es/helpers/index.js"}],"node_modules/instantsearch.js/es/lib/stateMappings/simple.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -15539,13 +16681,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -15869,6 +17011,20 @@ var combine = function combine(a, b) {
   return [].concat(a, b);
 };
 
+var maybeMap = function maybeMap(val, fn) {
+  if (isArray(val)) {
+    var mapped = [];
+
+    for (var i = 0; i < val.length; i += 1) {
+      mapped.push(fn(val[i]));
+    }
+
+    return mapped;
+  }
+
+  return fn(val);
+};
+
 module.exports = {
   arrayToObject: arrayToObject,
   assign: assign,
@@ -15878,6 +17034,7 @@ module.exports = {
   encode: encode,
   isBuffer: isBuffer,
   isRegExp: isRegExp,
+  maybeMap: maybeMap,
   merge: merge
 };
 },{}],"node_modules/qs/lib/formats.js":[function(require,module,exports) {
@@ -15964,7 +17121,13 @@ var stringify = function stringify(object, prefix, generateArrayPrefix, strictNu
   } else if (obj instanceof Date) {
     obj = serializeDate(obj);
   } else if (generateArrayPrefix === 'comma' && isArray(obj)) {
-    obj = obj.join(',');
+    obj = utils.maybeMap(obj, function (value) {
+      if (value instanceof Date) {
+        return serializeDate(value);
+      }
+
+      return value;
+    }).join(',');
   }
 
   if (obj === null) {
@@ -16001,16 +17164,14 @@ var stringify = function stringify(object, prefix, generateArrayPrefix, strictNu
 
   for (var i = 0; i < objKeys.length; ++i) {
     var key = objKeys[i];
+    var value = obj[key];
 
-    if (skipNulls && obj[key] === null) {
+    if (skipNulls && value === null) {
       continue;
     }
 
-    if (isArray(obj)) {
-      pushToArray(values, stringify(obj[key], typeof generateArrayPrefix === 'function' ? generateArrayPrefix(prefix, key) : prefix, generateArrayPrefix, strictNullHandling, skipNulls, encoder, filter, sort, allowDots, serializeDate, formatter, encodeValuesOnly, charset));
-    } else {
-      pushToArray(values, stringify(obj[key], prefix + (allowDots ? '.' + key : '[' + key + ']'), generateArrayPrefix, strictNullHandling, skipNulls, encoder, filter, sort, allowDots, serializeDate, formatter, encodeValuesOnly, charset));
-    }
+    var keyPrefix = isArray(obj) ? typeof generateArrayPrefix === 'function' ? generateArrayPrefix(prefix, key) : prefix : prefix + (allowDots ? '.' + key : '[' + key + ']');
+    pushToArray(values, stringify(value, keyPrefix, generateArrayPrefix, strictNullHandling, skipNulls, encoder, filter, sort, allowDots, serializeDate, formatter, encodeValuesOnly, charset));
   }
 
   return values;
@@ -16160,6 +17321,14 @@ var interpretNumericEntities = function (str) {
   return str.replace(/&#(\d+);/g, function ($0, numberStr) {
     return String.fromCharCode(parseInt(numberStr, 10));
   });
+};
+
+var parseArrayValue = function (val, options) {
+  if (val && typeof val === 'string' && options.comma && val.indexOf(',') > -1) {
+    return val.split(',');
+  }
+
+  return val;
 }; // This is what browsers will submit when the ✓ character occurs in an
 // application/x-www-form-urlencoded body and the encoding of the page containing
 // the form is iso-8859-1, or when the submitted form has an accept-charset
@@ -16212,15 +17381,13 @@ var parseValues = function parseQueryStringValues(str, options) {
       val = options.strictNullHandling ? null : '';
     } else {
       key = options.decoder(part.slice(0, pos), defaults.decoder, charset, 'key');
-      val = options.decoder(part.slice(pos + 1), defaults.decoder, charset, 'value');
+      val = utils.maybeMap(parseArrayValue(part.slice(pos + 1), options), function (encodedVal) {
+        return options.decoder(encodedVal, defaults.decoder, charset, 'value');
+      });
     }
 
     if (val && options.interpretNumericEntities && charset === 'iso-8859-1') {
       val = interpretNumericEntities(val);
-    }
-
-    if (val && typeof val === 'string' && options.comma && val.indexOf(',') > -1) {
-      val = val.split(',');
     }
 
     if (part.indexOf('[]=') > -1) {
@@ -16237,8 +17404,8 @@ var parseValues = function parseQueryStringValues(str, options) {
   return obj;
 };
 
-var parseObject = function (chain, val, options) {
-  var leaf = val;
+var parseObject = function (chain, val, options, valuesParsed) {
+  var leaf = valuesParsed ? val : parseArrayValue(val, options);
 
   for (var i = chain.length - 1; i >= 0; --i) {
     var obj;
@@ -16263,13 +17430,13 @@ var parseObject = function (chain, val, options) {
       }
     }
 
-    leaf = obj;
+    leaf = obj; // eslint-disable-line no-param-reassign
   }
 
   return leaf;
 };
 
-var parseKeys = function parseQueryStringKeys(givenKey, val, options) {
+var parseKeys = function parseQueryStringKeys(givenKey, val, options, valuesParsed) {
   if (!givenKey) {
     return;
   } // Transform dot notation to bracket notation
@@ -16316,7 +17483,7 @@ var parseKeys = function parseQueryStringKeys(givenKey, val, options) {
     keys.push('[' + key.slice(segment.index) + ']');
   }
 
-  return parseObject(keys, val, options);
+  return parseObject(keys, val, options, valuesParsed);
 };
 
 var normalizeParseOptions = function normalizeParseOptions(opts) {
@@ -16329,7 +17496,7 @@ var normalizeParseOptions = function normalizeParseOptions(opts) {
   }
 
   if (typeof opts.charset !== 'undefined' && opts.charset !== 'utf-8' && opts.charset !== 'iso-8859-1') {
-    throw new Error('The charset option must be either utf-8, iso-8859-1, or undefined');
+    throw new TypeError('The charset option must be either utf-8, iso-8859-1, or undefined');
   }
 
   var charset = typeof opts.charset === 'undefined' ? defaults.charset : opts.charset;
@@ -16367,7 +17534,7 @@ module.exports = function (str, opts) {
 
   for (var i = 0; i < keys.length; ++i) {
     var key = keys[i];
-    var newObj = parseKeys(key, tempObj[key], options);
+    var newObj = parseKeys(key, tempObj[key], options, typeof str === 'string');
     obj = utils.merge(obj, newObj, options);
   }
 
@@ -16398,45 +17565,6 @@ exports.default = _default;
 var _qs = _interopRequireDefault(require("qs"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function isNativeReflectConstruct() {
-  if (typeof Reflect === "undefined" || !Reflect.construct) return false;
-  if (Reflect.construct.sham) return false;
-  if (typeof Proxy === "function") return true;
-
-  try {
-    Date.prototype.toString.call(Reflect.construct(Date, [], function () {}));
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
-
-function _construct(Parent, args, Class) {
-  if (isNativeReflectConstruct()) {
-    _construct = Reflect.construct;
-  } else {
-    _construct = function _construct(Parent, args, Class) {
-      var a = [null];
-      a.push.apply(a, args);
-      var Constructor = Function.bind.apply(Parent, a);
-      var instance = new Constructor();
-      if (Class) _setPrototypeOf(instance, Class.prototype);
-      return instance;
-    };
-  }
-
-  return _construct.apply(null, arguments);
-}
-
-function _setPrototypeOf(o, p) {
-  _setPrototypeOf = Object.setPrototypeOf || function _setPrototypeOf(o, p) {
-    o.__proto__ = p;
-    return o;
-  };
-
-  return _setPrototypeOf(o, p);
-}
 
 function _classCallCheck(instance, Constructor) {
   if (!(instance instanceof Constructor)) {
@@ -16659,362 +17787,25 @@ function () {
   return BrowserHistory;
 }();
 
-function _default() {
-  for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
-    args[_key] = arguments[_key];
-  }
-
-  return _construct(BrowserHistory, args);
+function _default(props) {
+  return new BrowserHistory(props);
 }
-},{"qs":"node_modules/qs/lib/index.js"}],"node_modules/instantsearch.js/es/lib/version.js":[function(require,module,exports) {
+},{"qs":"node_modules/qs/lib/index.js"}],"node_modules/instantsearch.js/es/middlewares/createRouterMiddleware.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.default = void 0;
-var _default = '4.0.0';
-exports.default = _default;
-},{}],"node_modules/instantsearch.js/es/lib/escape-highlight.js":[function(require,module,exports) {
-"use strict";
+exports.createRouterMiddleware = void 0;
 
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.default = escapeHits;
-exports.escapeFacets = escapeFacets;
-exports.TAG_REPLACEMENT = exports.TAG_PLACEHOLDER = void 0;
+var _simple = _interopRequireDefault(require("../lib/stateMappings/simple"));
+
+var _history = _interopRequireDefault(require("../lib/routers/history"));
 
 var _utils = require("../lib/utils");
-
-function ownKeys(object, enumerableOnly) {
-  var keys = Object.keys(object);
-
-  if (Object.getOwnPropertySymbols) {
-    var symbols = Object.getOwnPropertySymbols(object);
-    if (enumerableOnly) symbols = symbols.filter(function (sym) {
-      return Object.getOwnPropertyDescriptor(object, sym).enumerable;
-    });
-    keys.push.apply(keys, symbols);
-  }
-
-  return keys;
-}
-
-function _objectSpread(target) {
-  for (var i = 1; i < arguments.length; i++) {
-    var source = arguments[i] != null ? arguments[i] : {};
-
-    if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
-        _defineProperty(target, key, source[key]);
-      });
-    } else if (Object.getOwnPropertyDescriptors) {
-      Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
-    } else {
-      ownKeys(source).forEach(function (key) {
-        Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
-      });
-    }
-  }
-
-  return target;
-}
-
-function _defineProperty(obj, key, value) {
-  if (key in obj) {
-    Object.defineProperty(obj, key, {
-      value: value,
-      enumerable: true,
-      configurable: true,
-      writable: true
-    });
-  } else {
-    obj[key] = value;
-  }
-
-  return obj;
-}
-
-var TAG_PLACEHOLDER = {
-  highlightPreTag: '__ais-highlight__',
-  highlightPostTag: '__/ais-highlight__'
-};
-exports.TAG_PLACEHOLDER = TAG_PLACEHOLDER;
-var TAG_REPLACEMENT = {
-  highlightPreTag: '<mark>',
-  highlightPostTag: '</mark>'
-};
-exports.TAG_REPLACEMENT = TAG_REPLACEMENT;
-
-function replaceTagsAndEscape(value) {
-  return (0, _utils.escape)(value).replace(new RegExp(TAG_PLACEHOLDER.highlightPreTag, 'g'), TAG_REPLACEMENT.highlightPreTag).replace(new RegExp(TAG_PLACEHOLDER.highlightPostTag, 'g'), TAG_REPLACEMENT.highlightPostTag);
-}
-
-function recursiveEscape(input) {
-  if ((0, _utils.isPlainObject)(input) && typeof input.value !== 'string') {
-    return Object.keys(input).reduce(function (acc, key) {
-      return _objectSpread({}, acc, _defineProperty({}, key, recursiveEscape(input[key])));
-    }, {});
-  }
-
-  if (Array.isArray(input)) {
-    return input.map(recursiveEscape);
-  }
-
-  return _objectSpread({}, input, {
-    value: replaceTagsAndEscape(input.value)
-  });
-}
-
-function escapeHits(hits) {
-  if (hits.__escaped === undefined) {
-    hits = hits.map(function (hit) {
-      if (hit._highlightResult) {
-        hit._highlightResult = recursiveEscape(hit._highlightResult);
-      }
-
-      if (hit._snippetResult) {
-        hit._snippetResult = recursiveEscape(hit._snippetResult);
-      }
-
-      return hit;
-    });
-    hits.__escaped = true;
-  }
-
-  return hits;
-}
-
-function escapeFacets(facetHits) {
-  return facetHits.map(function (h) {
-    return _objectSpread({}, h, {
-      highlighted: replaceTagsAndEscape(h.highlighted)
-    });
-  });
-}
-},{"../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js"}],"node_modules/instantsearch.js/es/lib/suit.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.component = void 0;
-var NAMESPACE = 'ais';
-
-var component = function component(componentName) {
-  return function () {
-    var _ref = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {},
-        descendantName = _ref.descendantName,
-        modifierName = _ref.modifierName;
-
-    var descendent = descendantName ? "-".concat(descendantName) : '';
-    var modifier = modifierName ? "--".concat(modifierName) : '';
-    return "".concat(NAMESPACE, "-").concat(componentName).concat(descendent).concat(modifier);
-  };
-};
-
-exports.component = component;
-},{}],"node_modules/instantsearch.js/es/helpers/highlight.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.default = highlight;
-
-var _utils = require("../lib/utils");
-
-var _escapeHighlight = require("../lib/escape-highlight");
-
-var _suit = require("../lib/suit");
-
-var suit = (0, _suit.component)('Highlight');
-
-function highlight(_ref) {
-  var attribute = _ref.attribute,
-      _ref$highlightedTagNa = _ref.highlightedTagName,
-      highlightedTagName = _ref$highlightedTagNa === void 0 ? 'mark' : _ref$highlightedTagNa,
-      hit = _ref.hit;
-  var attributeValue = (0, _utils.getPropertyByPath)(hit, "_highlightResult.".concat(attribute, ".value")) || '';
-  var className = suit({
-    descendantName: 'highlighted'
-  });
-  return attributeValue.replace(new RegExp(_escapeHighlight.TAG_REPLACEMENT.highlightPreTag, 'g'), "<".concat(highlightedTagName, " class=\"").concat(className, "\">")).replace(new RegExp(_escapeHighlight.TAG_REPLACEMENT.highlightPostTag, 'g'), "</".concat(highlightedTagName, ">"));
-}
-},{"../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js","../lib/escape-highlight":"node_modules/instantsearch.js/es/lib/escape-highlight.js","../lib/suit":"node_modules/instantsearch.js/es/lib/suit.js"}],"node_modules/instantsearch.js/es/helpers/snippet.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.default = snippet;
-
-var _utils = require("../lib/utils");
-
-var _escapeHighlight = require("../lib/escape-highlight");
-
-var _suit = require("../lib/suit");
-
-var suit = (0, _suit.component)('Snippet');
-
-function snippet(_ref) {
-  var attribute = _ref.attribute,
-      _ref$highlightedTagNa = _ref.highlightedTagName,
-      highlightedTagName = _ref$highlightedTagNa === void 0 ? 'mark' : _ref$highlightedTagNa,
-      hit = _ref.hit;
-  var attributeValue = (0, _utils.getPropertyByPath)(hit, "_snippetResult.".concat(attribute, ".value")) || '';
-  var className = suit({
-    descendantName: 'highlighted'
-  });
-  return attributeValue.replace(new RegExp(_escapeHighlight.TAG_REPLACEMENT.highlightPreTag, 'g'), "<".concat(highlightedTagName, " class=\"").concat(className, "\">")).replace(new RegExp(_escapeHighlight.TAG_REPLACEMENT.highlightPostTag, 'g'), "</".concat(highlightedTagName, ">"));
-}
-},{"../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js","../lib/escape-highlight":"node_modules/instantsearch.js/es/lib/escape-highlight.js","../lib/suit":"node_modules/instantsearch.js/es/lib/suit.js"}],"node_modules/instantsearch.js/es/helpers/insights.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.readDataAttributes = readDataAttributes;
-exports.hasDataAttributes = hasDataAttributes;
-exports.writeDataAttributes = writeDataAttributes;
-exports.default = insights;
-
-function _typeof(obj) {
-  if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") {
-    _typeof = function _typeof(obj) {
-      return typeof obj;
-    };
-  } else {
-    _typeof = function _typeof(obj) {
-      return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj;
-    };
-  }
-
-  return _typeof(obj);
-}
-
-function readDataAttributes(domElement) {
-  var method = domElement.getAttribute('data-insights-method');
-  var serializedPayload = domElement.getAttribute('data-insights-payload');
-
-  if (typeof serializedPayload !== 'string') {
-    throw new Error('The insights helper expects `data-insights-payload` to be a base64-encoded JSON string.');
-  }
-
-  try {
-    var payload = JSON.parse(atob(serializedPayload));
-    return {
-      method: method,
-      payload: payload
-    };
-  } catch (error) {
-    throw new Error('The insights helper was unable to parse `data-insights-payload`.');
-  }
-}
-
-function hasDataAttributes(domElement) {
-  return domElement.hasAttribute('data-insights-method');
-}
-
-function writeDataAttributes(_ref) {
-  var method = _ref.method,
-      payload = _ref.payload;
-
-  if (_typeof(payload) !== 'object') {
-    throw new Error("The insights helper expects the payload to be an object.");
-  }
-
-  var serializedPayload;
-
-  try {
-    serializedPayload = btoa(JSON.stringify(payload));
-  } catch (error) {
-    throw new Error("Could not JSON serialize the payload object.");
-  }
-
-  return "data-insights-method=\"".concat(method, "\" data-insights-payload=\"").concat(serializedPayload, "\"");
-}
-
-function insights(method, payload) {
-  return writeDataAttributes({
-    method: method,
-    payload: payload
-  });
-}
-},{}],"node_modules/instantsearch.js/es/helpers/index.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-var _exportNames = {
-  highlight: true,
-  snippet: true,
-  insights: true
-};
-Object.defineProperty(exports, "highlight", {
-  enumerable: true,
-  get: function () {
-    return _highlight.default;
-  }
-});
-Object.defineProperty(exports, "snippet", {
-  enumerable: true,
-  get: function () {
-    return _snippet.default;
-  }
-});
-Object.defineProperty(exports, "insights", {
-  enumerable: true,
-  get: function () {
-    return _insights.default;
-  }
-});
-
-var _highlight = _interopRequireWildcard(require("./highlight"));
-
-Object.keys(_highlight).forEach(function (key) {
-  if (key === "default" || key === "__esModule") return;
-  if (Object.prototype.hasOwnProperty.call(_exportNames, key)) return;
-  Object.defineProperty(exports, key, {
-    enumerable: true,
-    get: function () {
-      return _highlight[key];
-    }
-  });
-});
-
-var _snippet = _interopRequireWildcard(require("./snippet"));
-
-Object.keys(_snippet).forEach(function (key) {
-  if (key === "default" || key === "__esModule") return;
-  if (Object.prototype.hasOwnProperty.call(_exportNames, key)) return;
-  Object.defineProperty(exports, key, {
-    enumerable: true,
-    get: function () {
-      return _snippet[key];
-    }
-  });
-});
-
-var _insights = _interopRequireDefault(require("./insights"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-function _getRequireWildcardCache() { if (typeof WeakMap !== "function") return null; var cache = new WeakMap(); _getRequireWildcardCache = function () { return cache; }; return cache; }
-
-function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } if (obj === null || typeof obj !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
-},{"./highlight":"node_modules/instantsearch.js/es/helpers/highlight.js","./snippet":"node_modules/instantsearch.js/es/helpers/snippet.js","./insights":"node_modules/instantsearch.js/es/helpers/insights.js"}],"node_modules/instantsearch.js/es/lib/createHelpers.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.default = hoganHelpers;
-
-var _helpers = require("../helpers");
-
 function ownKeys(object, enumerableOnly) {
   var keys = Object.keys(object);
 
@@ -17034,13 +17825,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -17064,35 +17855,74 @@ function _defineProperty(obj, key, value) {
   return obj;
 }
 
-function hoganHelpers(_ref) {
-  var numberLocale = _ref.numberLocale;
-  return {
-    formatNumber: function formatNumber(value, render) {
-      return Number(render(value)).toLocaleString(numberLocale);
-    },
-    highlight: function highlight(options, render) {
-      try {
-        var highlightOptions = JSON.parse(options);
-        return render((0, _helpers.highlight)(_objectSpread({}, highlightOptions, {
-          hit: this
-        })));
-      } catch (error) {
-        throw new Error("\nThe highlight helper expects a JSON object of the format:\n{ \"attribute\": \"name\", \"highlightedTagName\": \"mark\" }");
-      }
-    },
-    snippet: function snippet(options, render) {
-      try {
-        var snippetOptions = JSON.parse(options);
-        return render((0, _helpers.snippet)(_objectSpread({}, snippetOptions, {
-          hit: this
-        })));
-      } catch (error) {
-        throw new Error("\nThe snippet helper expects a JSON object of the format:\n{ \"attribute\": \"name\", \"highlightedTagName\": \"mark\" }");
-      }
+var walk = function walk(current, callback) {
+  callback(current);
+  current.getWidgets().filter(function (widget) {
+    return widget.$$type === 'ais.index';
+  }).forEach(function (innerIndex) {
+    walk(innerIndex, callback);
+  });
+};
+
+var createRouterMiddleware = function createRouterMiddleware() {
+  var props = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var _props$router = props.router,
+      router = _props$router === void 0 ? (0, _history.default)() : _props$router,
+      _props$stateMapping = props.stateMapping,
+      stateMapping = _props$stateMapping === void 0 ? (0, _simple.default)() : _props$stateMapping;
+  return function (_ref) {
+    var instantSearchInstance = _ref.instantSearchInstance;
+
+    function topLevelCreateURL(nextState) {
+      var uiState = Object.keys(nextState).reduce(function (acc, indexId) {
+        return _objectSpread({}, acc, _defineProperty({}, indexId, nextState[indexId]));
+      }, instantSearchInstance.mainIndex.getWidgetUiState({}));
+      var route = stateMapping.stateToRoute(uiState);
+      return router.createURL(route);
     }
+
+    instantSearchInstance._createURL = topLevelCreateURL;
+    instantSearchInstance._initialUiState = _objectSpread({}, instantSearchInstance._initialUiState, {}, stateMapping.routeToState(router.read()));
+    var lastRouteState = undefined;
+    return {
+      onStateChange: function onStateChange(_ref2) {
+        var uiState = _ref2.uiState;
+        var routeState = stateMapping.stateToRoute(uiState);
+
+        if (lastRouteState === undefined || !(0, _utils.isEqual)(lastRouteState, routeState)) {
+          router.write(routeState);
+          lastRouteState = routeState;
+        }
+      },
+      subscribe: function subscribe() {
+        router.onUpdate(function (route) {
+          var uiState = stateMapping.routeToState(route);
+          walk(instantSearchInstance.mainIndex, function (current) {
+            var widgets = current.getWidgets();
+            var indexUiState = uiState[current.getIndexId()] || {};
+            var searchParameters = widgets.reduce(function (parameters, widget) {
+              if (!widget.getWidgetSearchParameters) {
+                return parameters;
+              }
+
+              return widget.getWidgetSearchParameters(parameters, {
+                uiState: indexUiState
+              });
+            }, current.getHelper().state);
+            current.getHelper().overrideStateWithoutTriggeringChangeEvent(searchParameters);
+            instantSearchInstance.scheduleSearch();
+          });
+        });
+      },
+      unsubscribe: function unsubscribe() {
+        router.dispose();
+      }
+    };
   };
-}
-},{"../helpers":"node_modules/instantsearch.js/es/helpers/index.js"}],"node_modules/instantsearch.js/es/lib/InstantSearch.js":[function(require,module,exports) {
+};
+
+exports.createRouterMiddleware = createRouterMiddleware;
+},{"../lib/stateMappings/simple":"node_modules/instantsearch.js/es/lib/stateMappings/simple.js","../lib/routers/history":"node_modules/instantsearch.js/es/lib/routers/history.js","../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js"}],"node_modules/instantsearch.js/es/lib/InstantSearch.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -17104,19 +17934,19 @@ var _algoliasearchHelper = _interopRequireDefault(require("algoliasearch-helper"
 
 var _events = _interopRequireDefault(require("events"));
 
-var _index = _interopRequireDefault(require("../widgets/index/index"));
-
-var _RoutingManager = _interopRequireDefault(require("./RoutingManager"));
-
-var _simple = _interopRequireDefault(require("./stateMappings/simple"));
-
-var _history = _interopRequireDefault(require("./routers/history"));
+var _index = _interopRequireWildcard(require("../widgets/index/index"));
 
 var _version = _interopRequireDefault(require("./version"));
 
 var _createHelpers = _interopRequireDefault(require("./createHelpers"));
 
 var _utils = require("./utils");
+
+var _createRouterMiddleware = require("../middlewares/createRouterMiddleware");
+
+function _getRequireWildcardCache() { if (typeof WeakMap !== "function") return null; var cache = new WeakMap(); _getRequireWildcardCache = function () { return cache; }; return cache; }
+
+function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } if (obj === null || typeof obj !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -17132,40 +17962,6 @@ function _typeof(obj) {
   }
 
   return _typeof(obj);
-}
-
-function ownKeys(object, enumerableOnly) {
-  var keys = Object.keys(object);
-
-  if (Object.getOwnPropertySymbols) {
-    var symbols = Object.getOwnPropertySymbols(object);
-    if (enumerableOnly) symbols = symbols.filter(function (sym) {
-      return Object.getOwnPropertyDescriptor(object, sym).enumerable;
-    });
-    keys.push.apply(keys, symbols);
-  }
-
-  return keys;
-}
-
-function _objectSpread(target) {
-  for (var i = 1; i < arguments.length; i++) {
-    var source = arguments[i] != null ? arguments[i] : {};
-
-    if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
-        _defineProperty(target, key, source[key]);
-      });
-    } else if (Object.getOwnPropertyDescriptors) {
-      Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
-    } else {
-      ownKeys(source).forEach(function (key) {
-        Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
-      });
-    }
-  }
-
-  return target;
 }
 
 function _classCallCheck(instance, Constructor) {
@@ -17260,6 +18056,10 @@ function defaultCreateURL() {
   return '#';
 }
 /**
+ * Global options for an InstantSearch instance.
+ */
+
+/**
  * The actual implementation of the InstantSearch. This is
  * created using the `instantsearch` factory function.
  * It emits the 'render' event every time a search is done
@@ -17284,6 +18084,8 @@ function (_EventEmitter) {
 
     _defineProperty(_assertThisInitialized(_this), "insightsClient", void 0);
 
+    _defineProperty(_assertThisInitialized(_this), "onStateChange", null);
+
     _defineProperty(_assertThisInitialized(_this), "helper", void 0);
 
     _defineProperty(_assertThisInitialized(_this), "mainHelper", void 0);
@@ -17293,6 +18095,8 @@ function (_EventEmitter) {
     _defineProperty(_assertThisInitialized(_this), "started", void 0);
 
     _defineProperty(_assertThisInitialized(_this), "templatesConfig", void 0);
+
+    _defineProperty(_assertThisInitialized(_this), "renderState", {});
 
     _defineProperty(_assertThisInitialized(_this), "_stalledSearchDelay", void 0);
 
@@ -17308,10 +18112,14 @@ function (_EventEmitter) {
 
     _defineProperty(_assertThisInitialized(_this), "_mainHelperSearch", void 0);
 
-    _defineProperty(_assertThisInitialized(_this), "_routingManager", void 0);
+    _defineProperty(_assertThisInitialized(_this), "middleware", []);
+
+    _defineProperty(_assertThisInitialized(_this), "sendEventToInsights", void 0);
 
     _defineProperty(_assertThisInitialized(_this), "scheduleSearch", (0, _utils.defer)(function () {
-      _this.mainHelper.search();
+      if (_this.started) {
+        _this.mainHelper.search();
+      }
     }));
 
     _defineProperty(_assertThisInitialized(_this), "scheduleRender", (0, _utils.defer)(function () {
@@ -17328,14 +18136,47 @@ function (_EventEmitter) {
       _this.emit('render');
     }));
 
-    _defineProperty(_assertThisInitialized(_this), "onStateChange", function () {
-      var nextUiState = _this.mainIndex.getWidgetState({});
-
-      if (_this._routingManager) {
-        _this._routingManager.write({
-          state: nextUiState
-        });
+    _defineProperty(_assertThisInitialized(_this), "setUiState", function (uiState) {
+      if (!_this.mainHelper) {
+        throw new Error(withUsage('The `start` method needs to be called before `setUiState`.'));
       }
+
+      "development" === 'development' ? (0, _utils.warning)(false, "\n`setUiState` provides a powerful way to manage the UI state. This is considered experimental as the API might change in a next minor version.\n\nFeel free to give us feedback on GitHub: https://github.com/algolia/instantsearch.js/issues/new\n    ") : void 0; // We refresh the index UI state to update the local UI state that the
+      // main index passes to the function form of `setUiState`.
+
+      _this.mainIndex.refreshUiState();
+
+      var nextUiState = typeof uiState === 'function' ? uiState(_this.mainIndex.getWidgetUiState({})) : uiState;
+
+      var setIndexHelperState = function setIndexHelperState(indexWidget) {
+        if ("development" === 'development') {
+          (0, _utils.checkIndexUiState)({
+            index: indexWidget,
+            indexUiState: nextUiState[indexWidget.getIndexId()]
+          });
+        }
+
+        indexWidget.getHelper().overrideStateWithoutTriggeringChangeEvent(indexWidget.getWidgetSearchParameters(indexWidget.getHelper().state, {
+          uiState: nextUiState[indexWidget.getIndexId()]
+        }));
+        indexWidget.getWidgets().filter(_index.isIndexWidget).forEach(setIndexHelperState);
+      };
+
+      setIndexHelperState(_this.mainIndex);
+
+      _this.scheduleSearch();
+
+      _this.onInternalStateChange();
+    });
+
+    _defineProperty(_assertThisInitialized(_this), "onInternalStateChange", function () {
+      var nextUiState = _this.mainIndex.getWidgetUiState({});
+
+      _this.middleware.forEach(function (m) {
+        m.onStateChange({
+          uiState: nextUiState
+        });
+      });
     });
 
     var _options$indexName = options.indexName,
@@ -17351,7 +18192,9 @@ function (_EventEmitter) {
         _options$searchClient = options.searchClient,
         searchClient = _options$searchClient === void 0 ? null : _options$searchClient,
         _options$insightsClie = options.insightsClient,
-        insightsClient = _options$insightsClie === void 0 ? null : _options$insightsClie;
+        insightsClient = _options$insightsClie === void 0 ? null : _options$insightsClie,
+        _options$onStateChang = options.onStateChange,
+        onStateChange = _options$onStateChang === void 0 ? null : _options$onStateChang;
 
     if (indexName === null) {
       throw new Error(withUsage('The `indexName` option is required.'));
@@ -17361,10 +18204,6 @@ function (_EventEmitter) {
       throw new Error(withUsage('The `searchClient` option is required.'));
     }
 
-    if (typeof options.urlSync !== 'undefined') {
-      throw new Error(withUsage('The `urlSync` option was removed in InstantSearch.js 3. You may want to use the `routing` option.'));
-    }
-
     if (typeof searchClient.search !== 'function') {
       throw new Error("The `searchClient` must implement a `search` method.\n\nSee: https://www.algolia.com/doc/guides/building-search-ui/going-further/backend-search/in-depth/backend-instantsearch/js/");
     }
@@ -17372,6 +18211,8 @@ function (_EventEmitter) {
     if (typeof searchClient.addAlgoliaAgent === 'function') {
       searchClient.addAlgoliaAgent("instantsearch.js (".concat(_version.default, ")"));
     }
+
+    "development" === 'development' ? (0, _utils.warning)(insightsClient === null, "`insightsClient` property has been deprecated. It is still supported in 4.x releases, but not further. It is replaced by the `insights` middleware.\n\nFor more information, visit https://www.algolia.com/doc/guides/getting-insights-and-analytics/search-analytics/click-through-and-conversions/how-to/send-click-and-conversion-events-with-instantsearch/js/") : void 0;
 
     if (insightsClient && typeof insightsClient !== 'function') {
       throw new Error(withUsage('The `insightsClient` option should be a function.'));
@@ -17388,6 +18229,7 @@ function (_EventEmitter) {
     _this.mainIndex = (0, _index.default)({
       indexName: indexName
     });
+    _this.onStateChange = onStateChange;
     _this.started = false;
     _this.templatesConfig = {
       helpers: (0, _createHelpers.default)({
@@ -17405,38 +18247,68 @@ function (_EventEmitter) {
       _this._searchFunction = searchFunction;
     }
 
-    var defaultRoutingOptions = {
-      stateMapping: (0, _simple.default)(),
-      router: (0, _history.default)()
-    };
-    var routingOptions = null;
+    _this.sendEventToInsights = _utils.noop;
 
-    if (routing === true) {
-      routingOptions = defaultRoutingOptions;
-    } else if ((0, _utils.isPlainObject)(routing)) {
-      routingOptions = _objectSpread({}, defaultRoutingOptions, {}, routing);
-    }
+    if (routing) {
+      var routerOptions = typeof routing === 'boolean' ? undefined : routing;
 
-    if (routingOptions) {
-      _this._routingManager = new _RoutingManager.default(_objectSpread({}, routingOptions, {
-        instantSearchInstance: _assertThisInitialized(_this)
-      }));
-      _this._createURL = _this._routingManager.createURL;
-      _this._initialUiState = _objectSpread({}, initialUiState, {}, _this._routingManager.read());
+      _this.use((0, _createRouterMiddleware.createRouterMiddleware)(routerOptions));
     }
 
     return _this;
   }
   /**
-   * Adds a widget to the search instance.
-   * A widget can be added either before or after InstantSearch has started.
-   * @param widget The widget to add to InstantSearch.
+   * Hooks a middleware into the InstantSearch lifecycle.
    *
-   * @deprecated This method will still be supported in 4.x releases, but not further. It is replaced by `addWidgets([widget])`.
+   * This method is considered as experimental and is subject to change in
+   * minor versions.
    */
 
 
   _createClass(InstantSearch, [{
+    key: "use",
+    value: function use() {
+      var _this2 = this;
+
+      for (var _len = arguments.length, middleware = new Array(_len), _key = 0; _key < _len; _key++) {
+        middleware[_key] = arguments[_key];
+      }
+
+      var newMiddlewareList = middleware.map(function (fn) {
+        var newMiddleware = fn({
+          instantSearchInstance: _this2
+        });
+
+        _this2.middleware.push(newMiddleware);
+
+        return newMiddleware;
+      }); // If the instance has already started, we directly subscribe the
+      // middleware so they're notified of changes.
+
+      if (this.started) {
+        newMiddlewareList.forEach(function (m) {
+          m.subscribe();
+        });
+      }
+
+      return this;
+    } // @major we shipped with EXPERIMENTAL_use, but have changed that to just `use` now
+
+  }, {
+    key: "EXPERIMENTAL_use",
+    value: function EXPERIMENTAL_use() {
+      "development" === 'development' ? (0, _utils.warning)(false, 'The middleware API is now considered stable, so we recommend replacing `EXPERIMENTAL_use` with `use` before upgrading to the next major version.') : void 0;
+      return this.use.apply(this, arguments);
+    }
+    /**
+     * Adds a widget to the search instance.
+     * A widget can be added either before or after InstantSearch has started.
+     * @param widget The widget to add to InstantSearch.
+     *
+     * @deprecated This method will still be supported in 4.x releases, but not further. It is replaced by `addWidgets([widget])`.
+     */
+
+  }, {
     key: "addWidget",
     value: function addWidget(widget) {
       "development" === 'development' ? (0, _utils.warning)(false, 'addWidget will still be supported in 4.x releases, but not further. It is replaced by `addWidgets([widget])`') : void 0;
@@ -17511,7 +18383,7 @@ function (_EventEmitter) {
   }, {
     key: "start",
     value: function start() {
-      var _this2 = this;
+      var _this3 = this;
 
       if (this.started) {
         throw new Error(withUsage('The `start` method has already been called once.'));
@@ -17541,14 +18413,14 @@ function (_EventEmitter) {
         this._mainHelperSearch = mainHelper.search.bind(mainHelper);
 
         mainHelper.search = function () {
-          var mainIndexHelper = _this2.mainIndex.getHelper();
+          var mainIndexHelper = _this3.mainIndex.getHelper();
 
           var searchFunctionHelper = (0, _algoliasearchHelper.default)(fakeClient, mainIndexHelper.state.index, mainIndexHelper.state);
           searchFunctionHelper.once('search', function (_ref) {
             var state = _ref.state;
             mainIndexHelper.overrideStateWithoutTriggeringChangeEvent(state);
 
-            _this2._mainHelperSearch();
+            _this3._mainHelperSearch();
           }); // Forward state changes from `searchFunctionHelper` to `mainIndexHelper`
 
           searchFunctionHelper.on('change', function (_ref2) {
@@ -17556,7 +18428,7 @@ function (_EventEmitter) {
             mainIndexHelper.setState(state);
           });
 
-          _this2._searchFunction(searchFunctionHelper);
+          _this3._searchFunction(searchFunctionHelper);
 
           return mainHelper;
         };
@@ -17567,7 +18439,7 @@ function (_EventEmitter) {
       mainHelper.on('error', function (_ref3) {
         var error = _ref3.error;
 
-        _this2.emit('error', {
+        _this3.emit('error', {
           error: error
         });
       });
@@ -17577,11 +18449,9 @@ function (_EventEmitter) {
         parent: null,
         uiState: this._initialUiState
       });
-
-      if (this._routingManager) {
-        this._routingManager.subscribe();
-      }
-
+      this.middleware.forEach(function (m) {
+        m.subscribe();
+      });
       mainHelper.search(); // Keep the previous reference for legacy purpose, some pattern use
       // the direct Helper access `search.helper` (e.g multi-index).
 
@@ -17615,21 +18485,20 @@ function (_EventEmitter) {
       this.mainHelper.removeAllListeners();
       this.mainHelper = null;
       this.helper = null;
-
-      if (this._routingManager) {
-        this._routingManager.dispose();
-      }
+      this.middleware.forEach(function (m) {
+        m.unsubscribe();
+      });
     }
   }, {
     key: "scheduleStalledRender",
     value: function scheduleStalledRender() {
-      var _this3 = this;
+      var _this4 = this;
 
       if (!this._searchStalledTimer) {
         this._searchStalledTimer = setTimeout(function () {
-          _this3._isSearchStalled = true;
+          _this4._isSearchStalled = true;
 
-          _this3.scheduleRender();
+          _this4.scheduleRender();
         }, this._stalledSearchDelay);
       }
     }
@@ -17660,7 +18529,125 @@ function (_EventEmitter) {
 
 var _default = InstantSearch;
 exports.default = _default;
-},{"algoliasearch-helper":"node_modules/algoliasearch-helper/index.js","events":"node_modules/node-libs-browser/node_modules/events/events.js","../widgets/index/index":"node_modules/instantsearch.js/es/widgets/index/index.js","./RoutingManager":"node_modules/instantsearch.js/es/lib/RoutingManager.js","./stateMappings/simple":"node_modules/instantsearch.js/es/lib/stateMappings/simple.js","./routers/history":"node_modules/instantsearch.js/es/lib/routers/history.js","./version":"node_modules/instantsearch.js/es/lib/version.js","./createHelpers":"node_modules/instantsearch.js/es/lib/createHelpers.js","./utils":"node_modules/instantsearch.js/es/lib/utils/index.js"}],"node_modules/instantsearch.js/es/index.js":[function(require,module,exports) {
+},{"algoliasearch-helper":"node_modules/algoliasearch-helper/index.js","events":"node_modules/node-libs-browser/node_modules/events/events.js","../widgets/index/index":"node_modules/instantsearch.js/es/widgets/index/index.js","./version":"node_modules/instantsearch.js/es/lib/version.js","./createHelpers":"node_modules/instantsearch.js/es/lib/createHelpers.js","./utils":"node_modules/instantsearch.js/es/lib/utils/index.js","../middlewares/createRouterMiddleware":"node_modules/instantsearch.js/es/middlewares/createRouterMiddleware.js"}],"node_modules/instantsearch.js/es/lib/infiniteHitsCache/sessionStorage.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = createInfiniteHitsSessionStorageCache;
+
+var _utils = require("../utils");
+
+function _objectWithoutProperties(source, excluded) {
+  if (source == null) return {};
+
+  var target = _objectWithoutPropertiesLoose(source, excluded);
+
+  var key, i;
+
+  if (Object.getOwnPropertySymbols) {
+    var sourceSymbolKeys = Object.getOwnPropertySymbols(source);
+
+    for (i = 0; i < sourceSymbolKeys.length; i++) {
+      key = sourceSymbolKeys[i];
+      if (excluded.indexOf(key) >= 0) continue;
+      if (!Object.prototype.propertyIsEnumerable.call(source, key)) continue;
+      target[key] = source[key];
+    }
+  }
+
+  return target;
+}
+
+function _objectWithoutPropertiesLoose(source, excluded) {
+  if (source == null) return {};
+  var target = {};
+  var sourceKeys = Object.keys(source);
+  var key, i;
+
+  for (i = 0; i < sourceKeys.length; i++) {
+    key = sourceKeys[i];
+    if (excluded.indexOf(key) >= 0) continue;
+    target[key] = source[key];
+  }
+
+  return target;
+}
+
+function getStateWithoutPage(state) {
+  var _ref = state || {},
+      page = _ref.page,
+      rest = _objectWithoutProperties(_ref, ["page"]);
+
+  return rest;
+}
+
+var KEY = 'ais.infiniteHits';
+
+function hasSessionStorage() {
+  return typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined';
+}
+
+function createInfiniteHitsSessionStorageCache() {
+  return {
+    read: function read(_ref2) {
+      var state = _ref2.state;
+
+      if (!hasSessionStorage()) {
+        return null;
+      }
+
+      try {
+        var cache = JSON.parse( // @ts-ignore JSON.parse() requires a string, but it actually accepts null, too.
+        window.sessionStorage.getItem(KEY));
+        return cache && (0, _utils.isEqual)(cache.state, getStateWithoutPage(state)) ? cache.hits : null;
+      } catch (error) {
+        if (error instanceof SyntaxError) {
+          try {
+            window.sessionStorage.removeItem(KEY);
+          } catch (err) {// do nothing
+          }
+        }
+
+        return null;
+      }
+    },
+    write: function write(_ref3) {
+      var state = _ref3.state,
+          hits = _ref3.hits;
+
+      if (!hasSessionStorage()) {
+        return;
+      }
+
+      try {
+        window.sessionStorage.setItem(KEY, JSON.stringify({
+          state: getStateWithoutPage(state),
+          hits: hits
+        }));
+      } catch (error) {// do nothing
+      }
+    }
+  };
+}
+},{"../utils":"node_modules/instantsearch.js/es/lib/utils/index.js"}],"node_modules/instantsearch.js/es/lib/infiniteHitsCache/index.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+Object.defineProperty(exports, "createInfiniteHitsSessionStorageCache", {
+  enumerable: true,
+  get: function () {
+    return _sessionStorage.default;
+  }
+});
+
+var _sessionStorage = _interopRequireDefault(require("./sessionStorage"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+},{"./sessionStorage":"node_modules/instantsearch.js/es/lib/infiniteHitsCache/sessionStorage.js"}],"node_modules/instantsearch.js/es/index.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -17674,6 +18661,8 @@ var _version = _interopRequireDefault(require("./lib/version"));
 
 var _helpers = require("./helpers");
 
+var _infiniteHitsCache = require("./lib/infiniteHitsCache");
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 var instantsearch = function instantsearch(options) {
@@ -17683,6 +18672,9 @@ var instantsearch = function instantsearch(options) {
 instantsearch.version = _version.default;
 instantsearch.snippet = _helpers.snippet;
 instantsearch.highlight = _helpers.highlight;
+instantsearch.insights = _helpers.insights;
+instantsearch.getInsightsAnonymousUserToken = _helpers.getInsightsAnonymousUserToken;
+instantsearch.createInfiniteHitsSessionStorageCache = _infiniteHitsCache.createInfiniteHitsSessionStorageCache;
 Object.defineProperty(instantsearch, 'widgets', {
   get: function get() {
     throw new ReferenceError("\"instantsearch.widgets\" are not available from the ES build.\n\nTo import the widgets:\n\nimport { searchBox } from 'instantsearch.js/es/widgets'");
@@ -17695,33 +18687,33 @@ Object.defineProperty(instantsearch, 'connectors', {
 });
 var _default = instantsearch;
 exports.default = _default;
-},{"./lib/InstantSearch":"node_modules/instantsearch.js/es/lib/InstantSearch.js","./lib/version":"node_modules/instantsearch.js/es/lib/version.js","./helpers":"node_modules/instantsearch.js/es/helpers/index.js"}],"node_modules/preact/dist/preact.module.js":[function(require,module,exports) {
+},{"./lib/InstantSearch":"node_modules/instantsearch.js/es/lib/InstantSearch.js","./lib/version":"node_modules/instantsearch.js/es/lib/version.js","./helpers":"node_modules/instantsearch.js/es/helpers/index.js","./lib/infiniteHitsCache":"node_modules/instantsearch.js/es/lib/infiniteHitsCache/index.js"}],"node_modules/preact/dist/preact.module.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.render = E;
-exports.hydrate = H;
-exports.h = exports.createElement = h;
-exports.Fragment = d;
-exports.createRef = p;
-exports.Component = y;
-exports.cloneElement = I;
-exports.createContext = L;
+exports.render = O;
+exports.hydrate = S;
+exports.h = exports.createElement = v;
+exports.Fragment = p;
+exports.createRef = y;
+exports.Component = d;
+exports.cloneElement = q;
+exports.createContext = B;
 exports.toChildArray = b;
-exports._unmount = A;
+exports.__u = L;
 exports.options = exports.isValidElement = void 0;
 var n,
     l,
     u,
-    t,
     i,
+    t,
     o,
     r,
     f = {},
     e = [],
-    c = /acit|ex(?:s|g|n|p|$)|rph|grid|ows|mnc|ntw|ine[ch]|zoo|^ord/i;
+    c = /acit|ex(?:s|g|n|p|$)|rph|grid|ows|mnc|ntw|ine[ch]|zoo|^ord|itera/i;
 exports.isValidElement = l;
 exports.options = n;
 
@@ -17736,52 +18728,59 @@ function a(n) {
   l && l.removeChild(n);
 }
 
-function h(n, l, u) {
-  var t,
-      i,
+function v(n, l, u) {
+  var i,
+      t,
       o,
-      r,
-      f = arguments;
-  if (l = s({}, l), arguments.length > 3) for (u = [u], t = 3; t < arguments.length; t++) u.push(f[t]);
-  if (null != u && (l.children = u), null != n && null != n.defaultProps) for (i in n.defaultProps) void 0 === l[i] && (l[i] = n.defaultProps[i]);
-  return r = l.key, null != (o = l.ref) && delete l.ref, null != r && delete l.key, v(n, l, r, o);
+      r = arguments,
+      f = {};
+
+  for (o in l) "key" == o ? i = l[o] : "ref" == o ? t = l[o] : f[o] = l[o];
+
+  if (arguments.length > 3) for (u = [u], o = 3; o < arguments.length; o++) u.push(r[o]);
+  if (null != u && (f.children = u), "function" == typeof n && null != n.defaultProps) for (o in n.defaultProps) void 0 === f[o] && (f[o] = n.defaultProps[o]);
+  return h(n, f, i, t, null);
 }
 
-function v(l, u, t, i) {
-  var o = {
+function h(l, u, i, t, o) {
+  var r = {
     type: l,
     props: u,
-    key: t,
-    ref: i,
+    key: i,
+    ref: t,
     __k: null,
     __: null,
     __b: 0,
     __e: null,
-    __d: null,
+    __d: void 0,
     __c: null,
-    constructor: void 0
+    __h: null,
+    constructor: void 0,
+    __v: null == o ? ++n.__v : o
   };
-  return n.vnode && n.vnode(o), o;
+  return null != n.vnode && n.vnode(r), r;
 }
 
-function p() {
-  return {};
+function y() {
+  return {
+    current: null
+  };
 }
 
-function d(n) {
+function p(n) {
   return n.children;
 }
 
-function y(n, l) {
+function d(n, l) {
   this.props = n, this.context = l;
 }
 
-function m(n, l) {
-  if (null == l) return n.__ ? m(n.__, n.__.__k.indexOf(n) + 1) : null;
+function _(n, l) {
+  if (null == l) return n.__ ? _(n.__, n.__.__k.indexOf(n) + 1) : null;
 
   for (var u; l < n.__k.length; l++) if (null != (u = n.__k[l]) && null != u.__e) return u.__e;
 
-  return "function" == typeof n.type ? m(n) : null;
+  return "function" == typeof n.type ? _(n) : null;
 }
 
 function w(n) {
@@ -17797,132 +18796,144 @@ function w(n) {
   }
 }
 
-function g(l) {
-  (!l.__d && (l.__d = !0) && 1 === u.push(l) || i !== n.debounceRendering) && ((i = n.debounceRendering) || t)(k);
+function k(l) {
+  (!l.__d && (l.__d = !0) && u.push(l) && !g.__r++ || t !== n.debounceRendering) && ((t = n.debounceRendering) || i)(g);
 }
 
-function k() {
-  var n, l, t, i, o, r, f;
-
-  for (u.sort(function (n, l) {
-    return l.__v.__b - n.__v.__b;
-  }); n = u.pop();) n.__d && (t = void 0, i = void 0, r = (o = (l = n).__v).__e, (f = l.__P) && (t = [], i = T(f, o, s({}, o), l.__n, void 0 !== f.ownerSVGElement, null, t, null == r ? m(o) : r), $(t, o), i != r && w(o)));
+function g() {
+  for (var n; g.__r = u.length;) n = u.sort(function (n, l) {
+    return n.__v.__b - l.__v.__b;
+  }), u = [], n.some(function (n) {
+    var l, u, i, t, o, r, f;
+    n.__d && (r = (o = (l = n).__v).__e, (f = l.__P) && (u = [], (i = s({}, o)).__v = o.__v + 1, t = $(f, o, i, l.__n, void 0 !== f.ownerSVGElement, null != o.__h ? [r] : null, u, null == r ? _(o) : r, o.__h), j(u, o), t != r && w(o)));
+  });
 }
 
-function _(n, l, u, t, i, o, r, c, s) {
-  var h,
-      v,
-      p,
+function m(n, l, u, i, t, o, r, c, s, v) {
+  var y,
       d,
-      y,
       w,
+      k,
       g,
-      k = u && u.__k || e,
-      _ = k.length;
-  if (c == f && (c = null != o ? o[0] : _ ? m(u, 0) : null), h = 0, l.__k = b(l.__k, function (u) {
-    if (null != u) {
-      if (u.__ = l, u.__b = l.__b + 1, null === (p = k[h]) || p && u.key == p.key && u.type === p.type) k[h] = void 0;else for (v = 0; v < _; v++) {
-        if ((p = k[v]) && u.key == p.key && u.type === p.type) {
-          k[v] = void 0;
-          break;
-        }
+      m,
+      b,
+      A = i && i.__k || e,
+      P = A.length;
 
-        p = null;
+  for (s == f && (s = null != r ? r[0] : P ? _(i, 0) : null), u.__k = [], y = 0; y < l.length; y++) if (null != (k = u.__k[y] = null == (k = l[y]) || "boolean" == typeof k ? null : "string" == typeof k || "number" == typeof k ? h(null, k, null, null, k) : Array.isArray(k) ? h(p, {
+    children: k
+  }, null, null, null) : null != k.__e || null != k.__c ? h(k.type, k.props, k.key, null, k.__v) : k)) {
+    if (k.__ = u, k.__b = u.__b + 1, null === (w = A[y]) || w && k.key == w.key && k.type === w.type) A[y] = void 0;else for (d = 0; d < P; d++) {
+      if ((w = A[d]) && k.key == w.key && k.type === w.type) {
+        A[d] = void 0;
+        break;
       }
 
-      if (d = T(n, u, p = p || f, t, i, o, r, c, s), (v = u.ref) && p.ref != v && (g || (g = []), p.ref && g.push(p.ref, null, u), g.push(v, u.__c || d, u)), null != d) {
-        if (null == w && (w = d), null != u.__d) d = u.__d, u.__d = null;else if (o == p || d != c || null == d.parentNode) {
-          n: if (null == c || c.parentNode !== n) n.appendChild(d);else {
-            for (y = c, v = 0; (y = y.nextSibling) && v < _; v += 2) if (y == d) break n;
-
-            n.insertBefore(d, c);
-          }
-
-          "option" == l.type && (n.value = "");
-        }
-        c = d.nextSibling, "function" == typeof l.type && (l.__d = d);
-      }
+      w = null;
     }
+    g = $(n, k, w = w || f, t, o, r, c, s, v), (d = k.ref) && w.ref != d && (b || (b = []), w.ref && b.push(w.ref, null, k), b.push(d, k.__c || g, k)), null != g ? (null == m && (m = g), s = x(n, k, w, A, r, g, s), v || "option" != u.type ? "function" == typeof u.type && (u.__d = s) : n.value = "") : s && w.__e == s && s.parentNode != n && (s = _(w));
+  }
 
-    return h++, u;
-  }), l.__e = w, null != o && "function" != typeof l.type) for (h = o.length; h--;) null != o[h] && a(o[h]);
+  if (u.__e = m, null != r && "function" != typeof u.type) for (y = r.length; y--;) null != r[y] && a(r[y]);
 
-  for (h = _; h--;) null != k[h] && A(k[h], k[h]);
+  for (y = P; y--;) null != A[y] && L(A[y], A[y]);
 
-  if (g) for (h = 0; h < g.length; h++) z(g[h], g[++h], g[++h]);
+  if (b) for (y = 0; y < b.length; y++) I(b[y], b[++y], b[++y]);
 }
 
-function b(n, l, u) {
-  if (null == u && (u = []), null == n || "boolean" == typeof n) l && u.push(l(null));else if (Array.isArray(n)) for (var t = 0; t < n.length; t++) b(n[t], l, u);else u.push(l ? l("string" == typeof n || "number" == typeof n ? v(null, n, null, null) : null != n.__e || null != n.__c ? v(n.type, n.props, n.key, null) : n) : n);
-  return u;
+function b(n, l) {
+  return l = l || [], null == n || "boolean" == typeof n || (Array.isArray(n) ? n.some(function (n) {
+    b(n, l);
+  }) : l.push(n)), l;
 }
 
-function x(n, l, u, t, i) {
+function x(n, l, u, i, t, o, r) {
+  var f, e, c;
+  if (void 0 !== l.__d) f = l.__d, l.__d = void 0;else if (t == u || o != r || null == o.parentNode) n: if (null == r || r.parentNode !== n) n.appendChild(o), f = null;else {
+    for (e = r, c = 0; (e = e.nextSibling) && c < i.length; c += 2) if (e == o) break n;
+
+    n.insertBefore(o, r), f = r;
+  }
+  return void 0 !== f ? f : o.nextSibling;
+}
+
+function A(n, l, u, i, t) {
   var o;
 
-  for (o in u) o in l || P(n, o, null, u[o], t);
+  for (o in u) "children" === o || "key" === o || o in l || C(n, o, null, u[o], i);
 
-  for (o in l) i && "function" != typeof l[o] || "value" === o || "checked" === o || u[o] === l[o] || P(n, o, l[o], u[o], t);
+  for (o in l) t && "function" != typeof l[o] || "children" === o || "key" === o || "value" === o || "checked" === o || u[o] === l[o] || C(n, o, l[o], u[o], i);
 }
 
-function C(n, l, u) {
-  "-" === l[0] ? n.setProperty(l, u) : n[l] = "number" == typeof u && !1 === c.test(l) ? u + "px" : null == u ? "" : u;
+function P(n, l, u) {
+  "-" === l[0] ? n.setProperty(l, u) : n[l] = null == u ? "" : "number" != typeof u || c.test(l) ? u : u + "px";
 }
 
-function P(n, l, u, t, i) {
-  var o, r, f, e, c;
-  if (i ? "className" === l && (l = "class") : "class" === l && (l = "className"), "key" === l || "children" === l) ;else if ("style" === l) {
-    if (o = n.style, "string" == typeof u) o.cssText = u;else {
-      if ("string" == typeof t && (o.cssText = "", t = null), t) for (r in t) u && r in u || C(o, r, "");
-      if (u) for (f in u) t && u[f] === t[f] || C(o, f, u[f]);
+function C(n, l, u, i, t) {
+  var o, r, f;
+  if (t && "className" == l && (l = "class"), "style" === l) {
+    if ("string" == typeof u) n.style.cssText = u;else {
+      if ("string" == typeof i && (n.style.cssText = i = ""), i) for (l in i) u && l in u || P(n.style, l, "");
+      if (u) for (l in u) i && u[l] === i[l] || P(n.style, l, u[l]);
     }
-  } else "o" === l[0] && "n" === l[1] ? (e = l !== (l = l.replace(/Capture$/, "")), c = l.toLowerCase(), l = (c in n ? c : l).slice(2), u ? (t || n.addEventListener(l, N, e), (n.l || (n.l = {}))[l] = u) : n.removeEventListener(l, N, e)) : "list" !== l && "tagName" !== l && "form" !== l && !i && l in n ? n[l] = null == u ? "" : u : "function" != typeof u && "dangerouslySetInnerHTML" !== l && (l !== (l = l.replace(/^xlink:?/, "")) ? null == u || !1 === u ? n.removeAttributeNS("http://www.w3.org/1999/xlink", l.toLowerCase()) : n.setAttributeNS("http://www.w3.org/1999/xlink", l.toLowerCase(), u) : null == u || !1 === u ? n.removeAttribute(l) : n.setAttribute(l, u));
+  } else "o" === l[0] && "n" === l[1] ? (o = l !== (l = l.replace(/Capture$/, "")), (r = l.toLowerCase()) in n && (l = r), l = l.slice(2), n.l || (n.l = {}), n.l[l + o] = u, f = o ? N : z, u ? i || n.addEventListener(l, f, o) : n.removeEventListener(l, f, o)) : "list" !== l && "tagName" !== l && "form" !== l && "type" !== l && "size" !== l && "download" !== l && "href" !== l && !t && l in n ? n[l] = null == u ? "" : u : "function" != typeof u && "dangerouslySetInnerHTML" !== l && (l !== (l = l.replace(/xlink:?/, "")) ? null == u || !1 === u ? n.removeAttributeNS("http://www.w3.org/1999/xlink", l.toLowerCase()) : n.setAttributeNS("http://www.w3.org/1999/xlink", l.toLowerCase(), u) : null == u || !1 === u && !/^ar/.test(l) ? n.removeAttribute(l) : n.setAttribute(l, u));
+}
+
+function z(l) {
+  this.l[l.type + !1](n.event ? n.event(l) : l);
 }
 
 function N(l) {
-  this.l[l.type](n.event ? n.event(l) : l);
+  this.l[l.type + !0](n.event ? n.event(l) : l);
 }
 
-function T(l, u, t, i, o, r, f, e, c) {
+function T(n, l, u) {
+  var i, t;
+
+  for (i = 0; i < n.__k.length; i++) (t = n.__k[i]) && (t.__ = n, t.__e && ("function" == typeof t.type && t.__k.length > 1 && T(t, l, u), l = x(u, t, t, n.__k, null, t.__e, l), "function" == typeof n.type && (n.__d = l)));
+}
+
+function $(l, u, i, t, o, r, f, e, c) {
   var a,
-      h,
       v,
-      p,
-      m,
+      h,
+      y,
+      _,
       w,
-      g,
       k,
+      g,
+      b,
       x,
-      C,
+      A,
       P = u.type;
+
   if (void 0 !== u.constructor) return null;
-  (a = n.__b) && a(u);
+  null != i.__h && (c = i.__h, e = u.__e = i.__e, u.__h = null, r = [e]), (a = n.__b) && a(u);
 
   try {
     n: if ("function" == typeof P) {
-      if (k = u.props, x = (a = P.contextType) && i[a.__c], C = a ? x ? x.props.value : a.__ : i, t.__c ? g = (h = u.__c = t.__c).__ = h.__E : ("prototype" in P && P.prototype.render ? u.__c = h = new P(k, C) : (u.__c = h = new y(k, C), h.constructor = P, h.render = D), x && x.sub(h), h.props = k, h.state || (h.state = {}), h.context = C, h.__n = i, v = h.__d = !0, h.__h = []), null == h.__s && (h.__s = h.state), null != P.getDerivedStateFromProps && (h.__s == h.state && (h.__s = s({}, h.__s)), s(h.__s, P.getDerivedStateFromProps(k, h.__s))), p = h.props, m = h.state, v) null == P.getDerivedStateFromProps && null != h.componentWillMount && h.componentWillMount(), null != h.componentDidMount && h.__h.push(h.componentDidMount);else {
-        if (null == P.getDerivedStateFromProps && null == h.__e && null != h.componentWillReceiveProps && h.componentWillReceiveProps(k, C), !h.__e && null != h.shouldComponentUpdate && !1 === h.shouldComponentUpdate(k, h.__s, C)) {
-          for (h.props = k, h.state = h.__s, h.__d = !1, h.__v = u, u.__e = t.__e, u.__k = t.__k, h.__h.length && f.push(h), a = 0; a < u.__k.length; a++) u.__k[a] && (u.__k[a].__ = u);
-
+      if (g = u.props, b = (a = P.contextType) && t[a.__c], x = a ? b ? b.props.value : a.__ : t, i.__c ? k = (v = u.__c = i.__c).__ = v.__E : ("prototype" in P && P.prototype.render ? u.__c = v = new P(g, x) : (u.__c = v = new d(g, x), v.constructor = P, v.render = M), b && b.sub(v), v.props = g, v.state || (v.state = {}), v.context = x, v.__n = t, h = v.__d = !0, v.__h = []), null == v.__s && (v.__s = v.state), null != P.getDerivedStateFromProps && (v.__s == v.state && (v.__s = s({}, v.__s)), s(v.__s, P.getDerivedStateFromProps(g, v.__s))), y = v.props, _ = v.state, h) null == P.getDerivedStateFromProps && null != v.componentWillMount && v.componentWillMount(), null != v.componentDidMount && v.__h.push(v.componentDidMount);else {
+        if (null == P.getDerivedStateFromProps && g !== y && null != v.componentWillReceiveProps && v.componentWillReceiveProps(g, x), !v.__e && null != v.shouldComponentUpdate && !1 === v.shouldComponentUpdate(g, v.__s, x) || u.__v === i.__v) {
+          v.props = g, v.state = v.__s, u.__v !== i.__v && (v.__d = !1), v.__v = u, u.__e = i.__e, u.__k = i.__k, v.__h.length && f.push(v), T(u, e, l);
           break n;
         }
 
-        null != h.componentWillUpdate && h.componentWillUpdate(k, h.__s, C), null != h.componentDidUpdate && h.__h.push(function () {
-          h.componentDidUpdate(p, m, w);
+        null != v.componentWillUpdate && v.componentWillUpdate(g, v.__s, x), null != v.componentDidUpdate && v.__h.push(function () {
+          v.componentDidUpdate(y, _, w);
         });
       }
-      h.context = C, h.props = k, h.state = h.__s, (a = n.__r) && a(u), h.__d = !1, h.__v = u, h.__P = l, a = h.render(h.props, h.state, h.context), u.__k = b(null != a && a.type == d && null == a.key ? a.props.children : a), null != h.getChildContext && (i = s(s({}, i), h.getChildContext())), v || null == h.getSnapshotBeforeUpdate || (w = h.getSnapshotBeforeUpdate(p, m)), _(l, u, t, i, o, r, f, e, c), h.base = u.__e, h.__h.length && f.push(h), g && (h.__E = h.__ = null), h.__e = null;
-    } else u.__e = j(t.__e, u, t, i, o, r, f, c);
+      v.context = x, v.props = g, v.state = v.__s, (a = n.__r) && a(u), v.__d = !1, v.__v = u, v.__P = l, a = v.render(v.props, v.state, v.context), v.state = v.__s, null != v.getChildContext && (t = s(s({}, t), v.getChildContext())), h || null == v.getSnapshotBeforeUpdate || (w = v.getSnapshotBeforeUpdate(y, _)), A = null != a && a.type == p && null == a.key ? a.props.children : a, m(l, Array.isArray(A) ? A : [A], u, i, t, o, r, f, e, c), v.base = u.__e, u.__h = null, v.__h.length && f.push(v), k && (v.__E = v.__ = null), v.__e = !1;
+    } else null == r && u.__v === i.__v ? (u.__k = i.__k, u.__e = i.__e) : u.__e = H(i.__e, u, i, t, o, r, f, c);
 
     (a = n.diffed) && a(u);
   } catch (l) {
-    n.__e(l, u, t);
+    u.__v = null, (c || null != r) && (u.__e = e, u.__h = !!c, r[r.indexOf(e)] = null), n.__e(l, u, i);
   }
 
   return u.__e;
 }
 
-function $(l, u) {
+function j(l, u) {
   n.__c && n.__c(u, l), l.some(function (u) {
     try {
       l = u.__h, u.__h = [], l.some(function (n) {
@@ -17934,1253 +18945,132 @@ function $(l, u) {
   });
 }
 
-function j(n, l, u, t, i, o, r, c) {
+function H(n, l, u, i, t, o, r, c) {
   var s,
       a,
-      h,
       v,
-      p,
-      d = u.props,
-      y = l.props;
-  if (i = "svg" === l.type || i, null == n && null != o) for (s = 0; s < o.length; s++) if (null != (a = o[s]) && (null === l.type ? 3 === a.nodeType : a.localName === l.type)) {
+      h,
+      y,
+      p = u.props,
+      d = l.props;
+  if (t = "svg" === l.type || t, null != o) for (s = 0; s < o.length; s++) if (null != (a = o[s]) && ((null === l.type ? 3 === a.nodeType : a.localName === l.type) || n == a)) {
     n = a, o[s] = null;
     break;
   }
 
   if (null == n) {
-    if (null === l.type) return document.createTextNode(y);
-    n = i ? document.createElementNS("http://www.w3.org/2000/svg", l.type) : document.createElement(l.type), o = null;
+    if (null === l.type) return document.createTextNode(d);
+    n = t ? document.createElementNS("http://www.w3.org/2000/svg", l.type) : document.createElement(l.type, d.is && {
+      is: d.is
+    }), o = null, c = !1;
   }
 
-  if (null === l.type) null != o && (o[o.indexOf(n)] = null), d !== y && (n.data = y);else if (l !== u) {
-    if (null != o && (o = e.slice.call(n.childNodes)), h = (d = u.props || f).dangerouslySetInnerHTML, v = y.dangerouslySetInnerHTML, !c) {
-      if (d === f) for (d = {}, p = 0; p < n.attributes.length; p++) d[n.attributes[p].name] = n.attributes[p].value;
-      (v || h) && (v && h && v.__html == h.__html || (n.innerHTML = v && v.__html || ""));
+  if (null === l.type) p === d || c && n.data === d || (n.data = d);else {
+    if (null != o && (o = e.slice.call(n.childNodes)), v = (p = u.props || f).dangerouslySetInnerHTML, h = d.dangerouslySetInnerHTML, !c) {
+      if (null != o) for (p = {}, y = 0; y < n.attributes.length; y++) p[n.attributes[y].name] = n.attributes[y].value;
+      (h || v) && (h && (v && h.__html == v.__html || h.__html === n.innerHTML) || (n.innerHTML = h && h.__html || ""));
     }
 
-    x(n, y, d, i, c), l.__k = l.props.children, v || _(n, l, u, t, "foreignObject" !== l.type && i, o, r, f, c), c || ("value" in y && void 0 !== y.value && y.value !== n.value && (n.value = null == y.value ? "" : y.value), "checked" in y && void 0 !== y.checked && y.checked !== n.checked && (n.checked = y.checked));
+    A(n, d, p, t, c), h ? l.__k = [] : (s = l.props.children, m(n, Array.isArray(s) ? s : [s], l, u, i, "foreignObject" !== l.type && t, o, r, f, c)), c || ("value" in d && void 0 !== (s = d.value) && (s !== n.value || "progress" === l.type && !s) && C(n, "value", s, p.value, !1), "checked" in d && void 0 !== (s = d.checked) && s !== n.checked && C(n, "checked", s, p.checked, !1));
   }
   return n;
 }
 
-function z(l, u, t) {
+function I(l, u, i) {
   try {
     "function" == typeof l ? l(u) : l.current = u;
   } catch (l) {
-    n.__e(l, t);
+    n.__e(l, i);
   }
 }
 
-function A(l, u, t) {
-  var i, o, r;
+function L(l, u, i) {
+  var t, o, r;
 
-  if (n.unmount && n.unmount(l), (i = l.ref) && z(i, null, u), t || "function" == typeof l.type || (t = null != (o = l.__e)), l.__e = l.__d = null, null != (i = l.__c)) {
-    if (i.componentWillUnmount) try {
-      i.componentWillUnmount();
+  if (n.unmount && n.unmount(l), (t = l.ref) && (t.current && t.current !== l.__e || I(t, null, u)), i || "function" == typeof l.type || (i = null != (o = l.__e)), l.__e = l.__d = void 0, null != (t = l.__c)) {
+    if (t.componentWillUnmount) try {
+      t.componentWillUnmount();
     } catch (l) {
       n.__e(l, u);
     }
-    i.base = i.__P = null;
+    t.base = t.__P = null;
   }
 
-  if (i = l.__k) for (r = 0; r < i.length; r++) i[r] && A(i[r], u, t);
+  if (t = l.__k) for (r = 0; r < t.length; r++) t[r] && L(t[r], u, i);
   null != o && a(o);
 }
 
-function D(n, l, u) {
+function M(n, l, u) {
   return this.constructor(n, u);
 }
 
-function E(l, u, t) {
-  var i, r, c;
-  n.__ && n.__(l, u), r = (i = t === o) ? null : t && t.__k || u.__k, l = h(d, null, [l]), c = [], T(u, (i ? u : t || u).__k = l, r || f, f, void 0 !== u.ownerSVGElement, t && !i ? [t] : r ? null : e.slice.call(u.childNodes), c, t || f, i), $(c, l);
+function O(l, u, i) {
+  var t, r, c;
+  n.__ && n.__(l, u), r = (t = i === o) ? null : i && i.__k || u.__k, l = v(p, null, [l]), c = [], $(u, (t ? u : i || u).__k = l, r || f, f, void 0 !== u.ownerSVGElement, i && !t ? [i] : r ? null : u.childNodes.length ? e.slice.call(u.childNodes) : null, c, i || f, t), j(c, l);
 }
 
-function H(n, l) {
-  E(n, l, o);
+function S(n, l) {
+  O(n, l, o);
 }
 
-function I(n, l) {
-  return l = s(s({}, n.props), l), arguments.length > 2 && (l.children = e.slice.call(arguments, 2)), v(n.type, l, l.key || n.key, l.ref || n.ref);
+function q(n, l, u) {
+  var i,
+      t,
+      o,
+      r = arguments,
+      f = s({}, n.props);
+
+  for (o in l) "key" == o ? i = l[o] : "ref" == o ? t = l[o] : f[o] = l[o];
+
+  if (arguments.length > 3) for (u = [u], o = 3; o < arguments.length; o++) u.push(r[o]);
+  return null != u && (f.children = u), h(n.type, f, i || n.key, t || n.ref, null);
 }
 
-function L(n) {
-  var l = {},
-      u = {
-    __c: "__cC" + r++,
+function B(n, l) {
+  var u = {
+    __c: l = "__cC" + r++,
     __: n,
     Consumer: function (n, l) {
       return n.children(l);
     },
-    Provider: function (n) {
-      var t,
-          i = this;
-      return this.getChildContext || (t = [], this.getChildContext = function () {
-        return l[u.__c] = i, l;
-      }, this.shouldComponentUpdate = function (l) {
-        n.value !== l.value && t.some(function (n) {
-          n.context = l.value, g(n);
-        });
+    Provider: function (n, u, i) {
+      return this.getChildContext || (u = [], (i = {})[l] = this, this.getChildContext = function () {
+        return i;
+      }, this.shouldComponentUpdate = function (n) {
+        this.props.value !== n.value && u.some(k);
       }, this.sub = function (n) {
-        t.push(n);
+        u.push(n);
         var l = n.componentWillUnmount;
 
         n.componentWillUnmount = function () {
-          t.splice(t.indexOf(n), 1), l && l.call(n);
+          u.splice(u.indexOf(n), 1), l && l.call(n);
         };
       }), n.children;
     }
   };
-  return u.Consumer.contextType = u, u;
+  return u.Provider.__ = u.Consumer.contextType = u;
 }
 
 exports.options = n = {
   __e: function (n, l) {
-    for (var u; l = l.__;) if ((u = l.__c) && !u.__) try {
-      if (u.constructor && null != u.constructor.getDerivedStateFromError) u.setState(u.constructor.getDerivedStateFromError(n));else {
-        if (null == u.componentDidCatch) continue;
-        u.componentDidCatch(n);
-      }
-      return g(u.__E = u);
+    for (var u, i, t, o = l.__h; l = l.__;) if ((u = l.__c) && !u.__) try {
+      if ((i = u.constructor) && null != i.getDerivedStateFromError && (u.setState(i.getDerivedStateFromError(n)), t = u.__d), null != u.componentDidCatch && (u.componentDidCatch(n), t = u.__d), t) return l.__h = o, u.__E = u;
     } catch (l) {
       n = l;
     }
 
     throw n;
-  }
+  },
+  __v: 0
 }, exports.isValidElement = l = function (n) {
   return null != n && void 0 === n.constructor;
-}, y.prototype.setState = function (n, l) {
+}, d.prototype.setState = function (n, l) {
   var u;
-  u = this.__s !== this.state ? this.__s : this.__s = s({}, this.state), "function" == typeof n && (n = n(u, this.props)), n && s(u, n), null != n && this.__v && (this.__e = !1, l && this.__h.push(l), g(this));
-}, y.prototype.forceUpdate = function (n) {
-  this.__v && (this.__e = !0, n && this.__h.push(n), g(this));
-}, y.prototype.render = d, u = [], t = "function" == typeof Promise ? Promise.prototype.then.bind(Promise.resolve()) : setTimeout, o = f, r = 0;
-},{}],"node_modules/react-is/cjs/react-is.development.js":[function(require,module,exports) {
-/** @license React v16.12.0
- * react-is.development.js
- *
- * Copyright (c) Facebook, Inc. and its affiliates.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-'use strict';
-
-if ("development" !== "production") {
-  (function () {
-    'use strict';
-
-    Object.defineProperty(exports, '__esModule', {
-      value: true
-    }); // The Symbol used to tag the ReactElement-like types. If there is no native Symbol
-    // nor polyfill, then a plain number is used for performance.
-
-    var hasSymbol = typeof Symbol === 'function' && Symbol.for;
-    var REACT_ELEMENT_TYPE = hasSymbol ? Symbol.for('react.element') : 0xeac7;
-    var REACT_PORTAL_TYPE = hasSymbol ? Symbol.for('react.portal') : 0xeaca;
-    var REACT_FRAGMENT_TYPE = hasSymbol ? Symbol.for('react.fragment') : 0xeacb;
-    var REACT_STRICT_MODE_TYPE = hasSymbol ? Symbol.for('react.strict_mode') : 0xeacc;
-    var REACT_PROFILER_TYPE = hasSymbol ? Symbol.for('react.profiler') : 0xead2;
-    var REACT_PROVIDER_TYPE = hasSymbol ? Symbol.for('react.provider') : 0xeacd;
-    var REACT_CONTEXT_TYPE = hasSymbol ? Symbol.for('react.context') : 0xeace; // TODO: We don't use AsyncMode or ConcurrentMode anymore. They were temporary
-    // (unstable) APIs that have been removed. Can we remove the symbols?
-
-    var REACT_ASYNC_MODE_TYPE = hasSymbol ? Symbol.for('react.async_mode') : 0xeacf;
-    var REACT_CONCURRENT_MODE_TYPE = hasSymbol ? Symbol.for('react.concurrent_mode') : 0xeacf;
-    var REACT_FORWARD_REF_TYPE = hasSymbol ? Symbol.for('react.forward_ref') : 0xead0;
-    var REACT_SUSPENSE_TYPE = hasSymbol ? Symbol.for('react.suspense') : 0xead1;
-    var REACT_SUSPENSE_LIST_TYPE = hasSymbol ? Symbol.for('react.suspense_list') : 0xead8;
-    var REACT_MEMO_TYPE = hasSymbol ? Symbol.for('react.memo') : 0xead3;
-    var REACT_LAZY_TYPE = hasSymbol ? Symbol.for('react.lazy') : 0xead4;
-    var REACT_FUNDAMENTAL_TYPE = hasSymbol ? Symbol.for('react.fundamental') : 0xead5;
-    var REACT_RESPONDER_TYPE = hasSymbol ? Symbol.for('react.responder') : 0xead6;
-    var REACT_SCOPE_TYPE = hasSymbol ? Symbol.for('react.scope') : 0xead7;
-
-    function isValidElementType(type) {
-      return typeof type === 'string' || typeof type === 'function' || // Note: its typeof might be other than 'symbol' or 'number' if it's a polyfill.
-      type === REACT_FRAGMENT_TYPE || type === REACT_CONCURRENT_MODE_TYPE || type === REACT_PROFILER_TYPE || type === REACT_STRICT_MODE_TYPE || type === REACT_SUSPENSE_TYPE || type === REACT_SUSPENSE_LIST_TYPE || typeof type === 'object' && type !== null && (type.$$typeof === REACT_LAZY_TYPE || type.$$typeof === REACT_MEMO_TYPE || type.$$typeof === REACT_PROVIDER_TYPE || type.$$typeof === REACT_CONTEXT_TYPE || type.$$typeof === REACT_FORWARD_REF_TYPE || type.$$typeof === REACT_FUNDAMENTAL_TYPE || type.$$typeof === REACT_RESPONDER_TYPE || type.$$typeof === REACT_SCOPE_TYPE);
-    }
-    /**
-     * Forked from fbjs/warning:
-     * https://github.com/facebook/fbjs/blob/e66ba20ad5be433eb54423f2b097d829324d9de6/packages/fbjs/src/__forks__/warning.js
-     *
-     * Only change is we use console.warn instead of console.error,
-     * and do nothing when 'console' is not supported.
-     * This really simplifies the code.
-     * ---
-     * Similar to invariant but only logs a warning if the condition is not met.
-     * This can be used to log issues in development environments in critical
-     * paths. Removing the logging code for production environments will keep the
-     * same logic and follow the same code paths.
-     */
-
-
-    var lowPriorityWarningWithoutStack = function () {};
-
-    {
-      var printWarning = function (format) {
-        for (var _len = arguments.length, args = new Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
-          args[_key - 1] = arguments[_key];
-        }
-
-        var argIndex = 0;
-        var message = 'Warning: ' + format.replace(/%s/g, function () {
-          return args[argIndex++];
-        });
-
-        if (typeof console !== 'undefined') {
-          console.warn(message);
-        }
-
-        try {
-          // --- Welcome to debugging React ---
-          // This error was thrown as a convenience so that you can use this stack
-          // to find the callsite that caused this warning to fire.
-          throw new Error(message);
-        } catch (x) {}
-      };
-
-      lowPriorityWarningWithoutStack = function (condition, format) {
-        if (format === undefined) {
-          throw new Error('`lowPriorityWarningWithoutStack(condition, format, ...args)` requires a warning ' + 'message argument');
-        }
-
-        if (!condition) {
-          for (var _len2 = arguments.length, args = new Array(_len2 > 2 ? _len2 - 2 : 0), _key2 = 2; _key2 < _len2; _key2++) {
-            args[_key2 - 2] = arguments[_key2];
-          }
-
-          printWarning.apply(void 0, [format].concat(args));
-        }
-      };
-    }
-    var lowPriorityWarningWithoutStack$1 = lowPriorityWarningWithoutStack;
-
-    function typeOf(object) {
-      if (typeof object === 'object' && object !== null) {
-        var $$typeof = object.$$typeof;
-
-        switch ($$typeof) {
-          case REACT_ELEMENT_TYPE:
-            var type = object.type;
-
-            switch (type) {
-              case REACT_ASYNC_MODE_TYPE:
-              case REACT_CONCURRENT_MODE_TYPE:
-              case REACT_FRAGMENT_TYPE:
-              case REACT_PROFILER_TYPE:
-              case REACT_STRICT_MODE_TYPE:
-              case REACT_SUSPENSE_TYPE:
-                return type;
-
-              default:
-                var $$typeofType = type && type.$$typeof;
-
-                switch ($$typeofType) {
-                  case REACT_CONTEXT_TYPE:
-                  case REACT_FORWARD_REF_TYPE:
-                  case REACT_LAZY_TYPE:
-                  case REACT_MEMO_TYPE:
-                  case REACT_PROVIDER_TYPE:
-                    return $$typeofType;
-
-                  default:
-                    return $$typeof;
-                }
-
-            }
-
-          case REACT_PORTAL_TYPE:
-            return $$typeof;
-        }
-      }
-
-      return undefined;
-    } // AsyncMode is deprecated along with isAsyncMode
-
-
-    var AsyncMode = REACT_ASYNC_MODE_TYPE;
-    var ConcurrentMode = REACT_CONCURRENT_MODE_TYPE;
-    var ContextConsumer = REACT_CONTEXT_TYPE;
-    var ContextProvider = REACT_PROVIDER_TYPE;
-    var Element = REACT_ELEMENT_TYPE;
-    var ForwardRef = REACT_FORWARD_REF_TYPE;
-    var Fragment = REACT_FRAGMENT_TYPE;
-    var Lazy = REACT_LAZY_TYPE;
-    var Memo = REACT_MEMO_TYPE;
-    var Portal = REACT_PORTAL_TYPE;
-    var Profiler = REACT_PROFILER_TYPE;
-    var StrictMode = REACT_STRICT_MODE_TYPE;
-    var Suspense = REACT_SUSPENSE_TYPE;
-    var hasWarnedAboutDeprecatedIsAsyncMode = false; // AsyncMode should be deprecated
-
-    function isAsyncMode(object) {
-      {
-        if (!hasWarnedAboutDeprecatedIsAsyncMode) {
-          hasWarnedAboutDeprecatedIsAsyncMode = true;
-          lowPriorityWarningWithoutStack$1(false, 'The ReactIs.isAsyncMode() alias has been deprecated, ' + 'and will be removed in React 17+. Update your code to use ' + 'ReactIs.isConcurrentMode() instead. It has the exact same API.');
-        }
-      }
-      return isConcurrentMode(object) || typeOf(object) === REACT_ASYNC_MODE_TYPE;
-    }
-
-    function isConcurrentMode(object) {
-      return typeOf(object) === REACT_CONCURRENT_MODE_TYPE;
-    }
-
-    function isContextConsumer(object) {
-      return typeOf(object) === REACT_CONTEXT_TYPE;
-    }
-
-    function isContextProvider(object) {
-      return typeOf(object) === REACT_PROVIDER_TYPE;
-    }
-
-    function isElement(object) {
-      return typeof object === 'object' && object !== null && object.$$typeof === REACT_ELEMENT_TYPE;
-    }
-
-    function isForwardRef(object) {
-      return typeOf(object) === REACT_FORWARD_REF_TYPE;
-    }
-
-    function isFragment(object) {
-      return typeOf(object) === REACT_FRAGMENT_TYPE;
-    }
-
-    function isLazy(object) {
-      return typeOf(object) === REACT_LAZY_TYPE;
-    }
-
-    function isMemo(object) {
-      return typeOf(object) === REACT_MEMO_TYPE;
-    }
-
-    function isPortal(object) {
-      return typeOf(object) === REACT_PORTAL_TYPE;
-    }
-
-    function isProfiler(object) {
-      return typeOf(object) === REACT_PROFILER_TYPE;
-    }
-
-    function isStrictMode(object) {
-      return typeOf(object) === REACT_STRICT_MODE_TYPE;
-    }
-
-    function isSuspense(object) {
-      return typeOf(object) === REACT_SUSPENSE_TYPE;
-    }
-
-    exports.typeOf = typeOf;
-    exports.AsyncMode = AsyncMode;
-    exports.ConcurrentMode = ConcurrentMode;
-    exports.ContextConsumer = ContextConsumer;
-    exports.ContextProvider = ContextProvider;
-    exports.Element = Element;
-    exports.ForwardRef = ForwardRef;
-    exports.Fragment = Fragment;
-    exports.Lazy = Lazy;
-    exports.Memo = Memo;
-    exports.Portal = Portal;
-    exports.Profiler = Profiler;
-    exports.StrictMode = StrictMode;
-    exports.Suspense = Suspense;
-    exports.isValidElementType = isValidElementType;
-    exports.isAsyncMode = isAsyncMode;
-    exports.isConcurrentMode = isConcurrentMode;
-    exports.isContextConsumer = isContextConsumer;
-    exports.isContextProvider = isContextProvider;
-    exports.isElement = isElement;
-    exports.isForwardRef = isForwardRef;
-    exports.isFragment = isFragment;
-    exports.isLazy = isLazy;
-    exports.isMemo = isMemo;
-    exports.isPortal = isPortal;
-    exports.isProfiler = isProfiler;
-    exports.isStrictMode = isStrictMode;
-    exports.isSuspense = isSuspense;
-  })();
-}
-},{}],"node_modules/react-is/index.js":[function(require,module,exports) {
-'use strict';
-
-if ("development" === 'production') {
-  module.exports = require('./cjs/react-is.production.min.js');
-} else {
-  module.exports = require('./cjs/react-is.development.js');
-}
-},{"./cjs/react-is.development.js":"node_modules/react-is/cjs/react-is.development.js"}],"node_modules/object-assign/index.js":[function(require,module,exports) {
-/*
-object-assign
-(c) Sindre Sorhus
-@license MIT
-*/
-'use strict';
-/* eslint-disable no-unused-vars */
-
-var getOwnPropertySymbols = Object.getOwnPropertySymbols;
-var hasOwnProperty = Object.prototype.hasOwnProperty;
-var propIsEnumerable = Object.prototype.propertyIsEnumerable;
-
-function toObject(val) {
-  if (val === null || val === undefined) {
-    throw new TypeError('Object.assign cannot be called with null or undefined');
-  }
-
-  return Object(val);
-}
-
-function shouldUseNative() {
-  try {
-    if (!Object.assign) {
-      return false;
-    } // Detect buggy property enumeration order in older V8 versions.
-    // https://bugs.chromium.org/p/v8/issues/detail?id=4118
-
-
-    var test1 = new String('abc'); // eslint-disable-line no-new-wrappers
-
-    test1[5] = 'de';
-
-    if (Object.getOwnPropertyNames(test1)[0] === '5') {
-      return false;
-    } // https://bugs.chromium.org/p/v8/issues/detail?id=3056
-
-
-    var test2 = {};
-
-    for (var i = 0; i < 10; i++) {
-      test2['_' + String.fromCharCode(i)] = i;
-    }
-
-    var order2 = Object.getOwnPropertyNames(test2).map(function (n) {
-      return test2[n];
-    });
-
-    if (order2.join('') !== '0123456789') {
-      return false;
-    } // https://bugs.chromium.org/p/v8/issues/detail?id=3056
-
-
-    var test3 = {};
-    'abcdefghijklmnopqrst'.split('').forEach(function (letter) {
-      test3[letter] = letter;
-    });
-
-    if (Object.keys(Object.assign({}, test3)).join('') !== 'abcdefghijklmnopqrst') {
-      return false;
-    }
-
-    return true;
-  } catch (err) {
-    // We don't expect any of the above to throw, but better to be safe.
-    return false;
-  }
-}
-
-module.exports = shouldUseNative() ? Object.assign : function (target, source) {
-  var from;
-  var to = toObject(target);
-  var symbols;
-
-  for (var s = 1; s < arguments.length; s++) {
-    from = Object(arguments[s]);
-
-    for (var key in from) {
-      if (hasOwnProperty.call(from, key)) {
-        to[key] = from[key];
-      }
-    }
-
-    if (getOwnPropertySymbols) {
-      symbols = getOwnPropertySymbols(from);
-
-      for (var i = 0; i < symbols.length; i++) {
-        if (propIsEnumerable.call(from, symbols[i])) {
-          to[symbols[i]] = from[symbols[i]];
-        }
-      }
-    }
-  }
-
-  return to;
-};
-},{}],"node_modules/prop-types/lib/ReactPropTypesSecret.js":[function(require,module,exports) {
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-
-'use strict';
-
-var ReactPropTypesSecret = 'SECRET_DO_NOT_PASS_THIS_OR_YOU_WILL_BE_FIRED';
-
-module.exports = ReactPropTypesSecret;
-
-},{}],"node_modules/prop-types/checkPropTypes.js":[function(require,module,exports) {
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-'use strict';
-
-var printWarning = function () {};
-
-if ("development" !== 'production') {
-  var ReactPropTypesSecret = require('./lib/ReactPropTypesSecret');
-
-  var loggedTypeFailures = {};
-  var has = Function.call.bind(Object.prototype.hasOwnProperty);
-
-  printWarning = function (text) {
-    var message = 'Warning: ' + text;
-
-    if (typeof console !== 'undefined') {
-      console.error(message);
-    }
-
-    try {
-      // --- Welcome to debugging React ---
-      // This error was thrown as a convenience so that you can use this stack
-      // to find the callsite that caused this warning to fire.
-      throw new Error(message);
-    } catch (x) {}
-  };
-}
-/**
- * Assert that the values match with the type specs.
- * Error messages are memorized and will only be shown once.
- *
- * @param {object} typeSpecs Map of name to a ReactPropType
- * @param {object} values Runtime values that need to be type-checked
- * @param {string} location e.g. "prop", "context", "child context"
- * @param {string} componentName Name of the component for error messages.
- * @param {?Function} getStack Returns the component stack.
- * @private
- */
-
-
-function checkPropTypes(typeSpecs, values, location, componentName, getStack) {
-  if ("development" !== 'production') {
-    for (var typeSpecName in typeSpecs) {
-      if (has(typeSpecs, typeSpecName)) {
-        var error; // Prop type validation may throw. In case they do, we don't want to
-        // fail the render phase where it didn't fail before. So we log it.
-        // After these have been cleaned up, we'll let them throw.
-
-        try {
-          // This is intentionally an invariant that gets caught. It's the same
-          // behavior as without this statement except with a better message.
-          if (typeof typeSpecs[typeSpecName] !== 'function') {
-            var err = Error((componentName || 'React class') + ': ' + location + ' type `' + typeSpecName + '` is invalid; ' + 'it must be a function, usually from the `prop-types` package, but received `' + typeof typeSpecs[typeSpecName] + '`.');
-            err.name = 'Invariant Violation';
-            throw err;
-          }
-
-          error = typeSpecs[typeSpecName](values, typeSpecName, componentName, location, null, ReactPropTypesSecret);
-        } catch (ex) {
-          error = ex;
-        }
-
-        if (error && !(error instanceof Error)) {
-          printWarning((componentName || 'React class') + ': type specification of ' + location + ' `' + typeSpecName + '` is invalid; the type checker ' + 'function must return `null` or an `Error` but returned a ' + typeof error + '. ' + 'You may have forgotten to pass an argument to the type checker ' + 'creator (arrayOf, instanceOf, objectOf, oneOf, oneOfType, and ' + 'shape all require an argument).');
-        }
-
-        if (error instanceof Error && !(error.message in loggedTypeFailures)) {
-          // Only monitor this failure once because there tends to be a lot of the
-          // same error.
-          loggedTypeFailures[error.message] = true;
-          var stack = getStack ? getStack() : '';
-          printWarning('Failed ' + location + ' type: ' + error.message + (stack != null ? stack : ''));
-        }
-      }
-    }
-  }
-}
-/**
- * Resets warning cache when testing.
- *
- * @private
- */
-
-
-checkPropTypes.resetWarningCache = function () {
-  if ("development" !== 'production') {
-    loggedTypeFailures = {};
-  }
-};
-
-module.exports = checkPropTypes;
-},{"./lib/ReactPropTypesSecret":"node_modules/prop-types/lib/ReactPropTypesSecret.js"}],"node_modules/prop-types/factoryWithTypeCheckers.js":[function(require,module,exports) {
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-'use strict';
-
-var ReactIs = require('react-is');
-
-var assign = require('object-assign');
-
-var ReactPropTypesSecret = require('./lib/ReactPropTypesSecret');
-
-var checkPropTypes = require('./checkPropTypes');
-
-var has = Function.call.bind(Object.prototype.hasOwnProperty);
-
-var printWarning = function () {};
-
-if ("development" !== 'production') {
-  printWarning = function (text) {
-    var message = 'Warning: ' + text;
-
-    if (typeof console !== 'undefined') {
-      console.error(message);
-    }
-
-    try {
-      // --- Welcome to debugging React ---
-      // This error was thrown as a convenience so that you can use this stack
-      // to find the callsite that caused this warning to fire.
-      throw new Error(message);
-    } catch (x) {}
-  };
-}
-
-function emptyFunctionThatReturnsNull() {
-  return null;
-}
-
-module.exports = function (isValidElement, throwOnDirectAccess) {
-  /* global Symbol */
-  var ITERATOR_SYMBOL = typeof Symbol === 'function' && Symbol.iterator;
-  var FAUX_ITERATOR_SYMBOL = '@@iterator'; // Before Symbol spec.
-
-  /**
-   * Returns the iterator method function contained on the iterable object.
-   *
-   * Be sure to invoke the function with the iterable as context:
-   *
-   *     var iteratorFn = getIteratorFn(myIterable);
-   *     if (iteratorFn) {
-   *       var iterator = iteratorFn.call(myIterable);
-   *       ...
-   *     }
-   *
-   * @param {?object} maybeIterable
-   * @return {?function}
-   */
-
-  function getIteratorFn(maybeIterable) {
-    var iteratorFn = maybeIterable && (ITERATOR_SYMBOL && maybeIterable[ITERATOR_SYMBOL] || maybeIterable[FAUX_ITERATOR_SYMBOL]);
-
-    if (typeof iteratorFn === 'function') {
-      return iteratorFn;
-    }
-  }
-  /**
-   * Collection of methods that allow declaration and validation of props that are
-   * supplied to React components. Example usage:
-   *
-   *   var Props = require('ReactPropTypes');
-   *   var MyArticle = React.createClass({
-   *     propTypes: {
-   *       // An optional string prop named "description".
-   *       description: Props.string,
-   *
-   *       // A required enum prop named "category".
-   *       category: Props.oneOf(['News','Photos']).isRequired,
-   *
-   *       // A prop named "dialog" that requires an instance of Dialog.
-   *       dialog: Props.instanceOf(Dialog).isRequired
-   *     },
-   *     render: function() { ... }
-   *   });
-   *
-   * A more formal specification of how these methods are used:
-   *
-   *   type := array|bool|func|object|number|string|oneOf([...])|instanceOf(...)
-   *   decl := ReactPropTypes.{type}(.isRequired)?
-   *
-   * Each and every declaration produces a function with the same signature. This
-   * allows the creation of custom validation functions. For example:
-   *
-   *  var MyLink = React.createClass({
-   *    propTypes: {
-   *      // An optional string or URI prop named "href".
-   *      href: function(props, propName, componentName) {
-   *        var propValue = props[propName];
-   *        if (propValue != null && typeof propValue !== 'string' &&
-   *            !(propValue instanceof URI)) {
-   *          return new Error(
-   *            'Expected a string or an URI for ' + propName + ' in ' +
-   *            componentName
-   *          );
-   *        }
-   *      }
-   *    },
-   *    render: function() {...}
-   *  });
-   *
-   * @internal
-   */
-
-
-  var ANONYMOUS = '<<anonymous>>'; // Important!
-  // Keep this list in sync with production version in `./factoryWithThrowingShims.js`.
-
-  var ReactPropTypes = {
-    array: createPrimitiveTypeChecker('array'),
-    bool: createPrimitiveTypeChecker('boolean'),
-    func: createPrimitiveTypeChecker('function'),
-    number: createPrimitiveTypeChecker('number'),
-    object: createPrimitiveTypeChecker('object'),
-    string: createPrimitiveTypeChecker('string'),
-    symbol: createPrimitiveTypeChecker('symbol'),
-    any: createAnyTypeChecker(),
-    arrayOf: createArrayOfTypeChecker,
-    element: createElementTypeChecker(),
-    elementType: createElementTypeTypeChecker(),
-    instanceOf: createInstanceTypeChecker,
-    node: createNodeChecker(),
-    objectOf: createObjectOfTypeChecker,
-    oneOf: createEnumTypeChecker,
-    oneOfType: createUnionTypeChecker,
-    shape: createShapeTypeChecker,
-    exact: createStrictShapeTypeChecker
-  };
-  /**
-   * inlined Object.is polyfill to avoid requiring consumers ship their own
-   * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/is
-   */
-
-  /*eslint-disable no-self-compare*/
-
-  function is(x, y) {
-    // SameValue algorithm
-    if (x === y) {
-      // Steps 1-5, 7-10
-      // Steps 6.b-6.e: +0 != -0
-      return x !== 0 || 1 / x === 1 / y;
-    } else {
-      // Step 6.a: NaN == NaN
-      return x !== x && y !== y;
-    }
-  }
-  /*eslint-enable no-self-compare*/
-
-  /**
-   * We use an Error-like object for backward compatibility as people may call
-   * PropTypes directly and inspect their output. However, we don't use real
-   * Errors anymore. We don't inspect their stack anyway, and creating them
-   * is prohibitively expensive if they are created too often, such as what
-   * happens in oneOfType() for any type before the one that matched.
-   */
-
-
-  function PropTypeError(message) {
-    this.message = message;
-    this.stack = '';
-  } // Make `instanceof Error` still work for returned errors.
-
-
-  PropTypeError.prototype = Error.prototype;
-
-  function createChainableTypeChecker(validate) {
-    if ("development" !== 'production') {
-      var manualPropTypeCallCache = {};
-      var manualPropTypeWarningCount = 0;
-    }
-
-    function checkType(isRequired, props, propName, componentName, location, propFullName, secret) {
-      componentName = componentName || ANONYMOUS;
-      propFullName = propFullName || propName;
-
-      if (secret !== ReactPropTypesSecret) {
-        if (throwOnDirectAccess) {
-          // New behavior only for users of `prop-types` package
-          var err = new Error('Calling PropTypes validators directly is not supported by the `prop-types` package. ' + 'Use `PropTypes.checkPropTypes()` to call them. ' + 'Read more at http://fb.me/use-check-prop-types');
-          err.name = 'Invariant Violation';
-          throw err;
-        } else if ("development" !== 'production' && typeof console !== 'undefined') {
-          // Old behavior for people using React.PropTypes
-          var cacheKey = componentName + ':' + propName;
-
-          if (!manualPropTypeCallCache[cacheKey] && // Avoid spamming the console because they are often not actionable except for lib authors
-          manualPropTypeWarningCount < 3) {
-            printWarning('You are manually calling a React.PropTypes validation ' + 'function for the `' + propFullName + '` prop on `' + componentName + '`. This is deprecated ' + 'and will throw in the standalone `prop-types` package. ' + 'You may be seeing this warning due to a third-party PropTypes ' + 'library. See https://fb.me/react-warning-dont-call-proptypes ' + 'for details.');
-            manualPropTypeCallCache[cacheKey] = true;
-            manualPropTypeWarningCount++;
-          }
-        }
-      }
-
-      if (props[propName] == null) {
-        if (isRequired) {
-          if (props[propName] === null) {
-            return new PropTypeError('The ' + location + ' `' + propFullName + '` is marked as required ' + ('in `' + componentName + '`, but its value is `null`.'));
-          }
-
-          return new PropTypeError('The ' + location + ' `' + propFullName + '` is marked as required in ' + ('`' + componentName + '`, but its value is `undefined`.'));
-        }
-
-        return null;
-      } else {
-        return validate(props, propName, componentName, location, propFullName);
-      }
-    }
-
-    var chainedCheckType = checkType.bind(null, false);
-    chainedCheckType.isRequired = checkType.bind(null, true);
-    return chainedCheckType;
-  }
-
-  function createPrimitiveTypeChecker(expectedType) {
-    function validate(props, propName, componentName, location, propFullName, secret) {
-      var propValue = props[propName];
-      var propType = getPropType(propValue);
-
-      if (propType !== expectedType) {
-        // `propValue` being instance of, say, date/regexp, pass the 'object'
-        // check, but we can offer a more precise error message here rather than
-        // 'of type `object`'.
-        var preciseType = getPreciseType(propValue);
-        return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` of type ' + ('`' + preciseType + '` supplied to `' + componentName + '`, expected ') + ('`' + expectedType + '`.'));
-      }
-
-      return null;
-    }
-
-    return createChainableTypeChecker(validate);
-  }
-
-  function createAnyTypeChecker() {
-    return createChainableTypeChecker(emptyFunctionThatReturnsNull);
-  }
-
-  function createArrayOfTypeChecker(typeChecker) {
-    function validate(props, propName, componentName, location, propFullName) {
-      if (typeof typeChecker !== 'function') {
-        return new PropTypeError('Property `' + propFullName + '` of component `' + componentName + '` has invalid PropType notation inside arrayOf.');
-      }
-
-      var propValue = props[propName];
-
-      if (!Array.isArray(propValue)) {
-        var propType = getPropType(propValue);
-        return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` of type ' + ('`' + propType + '` supplied to `' + componentName + '`, expected an array.'));
-      }
-
-      for (var i = 0; i < propValue.length; i++) {
-        var error = typeChecker(propValue, i, componentName, location, propFullName + '[' + i + ']', ReactPropTypesSecret);
-
-        if (error instanceof Error) {
-          return error;
-        }
-      }
-
-      return null;
-    }
-
-    return createChainableTypeChecker(validate);
-  }
-
-  function createElementTypeChecker() {
-    function validate(props, propName, componentName, location, propFullName) {
-      var propValue = props[propName];
-
-      if (!isValidElement(propValue)) {
-        var propType = getPropType(propValue);
-        return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` of type ' + ('`' + propType + '` supplied to `' + componentName + '`, expected a single ReactElement.'));
-      }
-
-      return null;
-    }
-
-    return createChainableTypeChecker(validate);
-  }
-
-  function createElementTypeTypeChecker() {
-    function validate(props, propName, componentName, location, propFullName) {
-      var propValue = props[propName];
-
-      if (!ReactIs.isValidElementType(propValue)) {
-        var propType = getPropType(propValue);
-        return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` of type ' + ('`' + propType + '` supplied to `' + componentName + '`, expected a single ReactElement type.'));
-      }
-
-      return null;
-    }
-
-    return createChainableTypeChecker(validate);
-  }
-
-  function createInstanceTypeChecker(expectedClass) {
-    function validate(props, propName, componentName, location, propFullName) {
-      if (!(props[propName] instanceof expectedClass)) {
-        var expectedClassName = expectedClass.name || ANONYMOUS;
-        var actualClassName = getClassName(props[propName]);
-        return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` of type ' + ('`' + actualClassName + '` supplied to `' + componentName + '`, expected ') + ('instance of `' + expectedClassName + '`.'));
-      }
-
-      return null;
-    }
-
-    return createChainableTypeChecker(validate);
-  }
-
-  function createEnumTypeChecker(expectedValues) {
-    if (!Array.isArray(expectedValues)) {
-      if ("development" !== 'production') {
-        if (arguments.length > 1) {
-          printWarning('Invalid arguments supplied to oneOf, expected an array, got ' + arguments.length + ' arguments. ' + 'A common mistake is to write oneOf(x, y, z) instead of oneOf([x, y, z]).');
-        } else {
-          printWarning('Invalid argument supplied to oneOf, expected an array.');
-        }
-      }
-
-      return emptyFunctionThatReturnsNull;
-    }
-
-    function validate(props, propName, componentName, location, propFullName) {
-      var propValue = props[propName];
-
-      for (var i = 0; i < expectedValues.length; i++) {
-        if (is(propValue, expectedValues[i])) {
-          return null;
-        }
-      }
-
-      var valuesString = JSON.stringify(expectedValues, function replacer(key, value) {
-        var type = getPreciseType(value);
-
-        if (type === 'symbol') {
-          return String(value);
-        }
-
-        return value;
-      });
-      return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` of value `' + String(propValue) + '` ' + ('supplied to `' + componentName + '`, expected one of ' + valuesString + '.'));
-    }
-
-    return createChainableTypeChecker(validate);
-  }
-
-  function createObjectOfTypeChecker(typeChecker) {
-    function validate(props, propName, componentName, location, propFullName) {
-      if (typeof typeChecker !== 'function') {
-        return new PropTypeError('Property `' + propFullName + '` of component `' + componentName + '` has invalid PropType notation inside objectOf.');
-      }
-
-      var propValue = props[propName];
-      var propType = getPropType(propValue);
-
-      if (propType !== 'object') {
-        return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` of type ' + ('`' + propType + '` supplied to `' + componentName + '`, expected an object.'));
-      }
-
-      for (var key in propValue) {
-        if (has(propValue, key)) {
-          var error = typeChecker(propValue, key, componentName, location, propFullName + '.' + key, ReactPropTypesSecret);
-
-          if (error instanceof Error) {
-            return error;
-          }
-        }
-      }
-
-      return null;
-    }
-
-    return createChainableTypeChecker(validate);
-  }
-
-  function createUnionTypeChecker(arrayOfTypeCheckers) {
-    if (!Array.isArray(arrayOfTypeCheckers)) {
-      "development" !== 'production' ? printWarning('Invalid argument supplied to oneOfType, expected an instance of array.') : void 0;
-      return emptyFunctionThatReturnsNull;
-    }
-
-    for (var i = 0; i < arrayOfTypeCheckers.length; i++) {
-      var checker = arrayOfTypeCheckers[i];
-
-      if (typeof checker !== 'function') {
-        printWarning('Invalid argument supplied to oneOfType. Expected an array of check functions, but ' + 'received ' + getPostfixForTypeWarning(checker) + ' at index ' + i + '.');
-        return emptyFunctionThatReturnsNull;
-      }
-    }
-
-    function validate(props, propName, componentName, location, propFullName) {
-      for (var i = 0; i < arrayOfTypeCheckers.length; i++) {
-        var checker = arrayOfTypeCheckers[i];
-
-        if (checker(props, propName, componentName, location, propFullName, ReactPropTypesSecret) == null) {
-          return null;
-        }
-      }
-
-      return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` supplied to ' + ('`' + componentName + '`.'));
-    }
-
-    return createChainableTypeChecker(validate);
-  }
-
-  function createNodeChecker() {
-    function validate(props, propName, componentName, location, propFullName) {
-      if (!isNode(props[propName])) {
-        return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` supplied to ' + ('`' + componentName + '`, expected a ReactNode.'));
-      }
-
-      return null;
-    }
-
-    return createChainableTypeChecker(validate);
-  }
-
-  function createShapeTypeChecker(shapeTypes) {
-    function validate(props, propName, componentName, location, propFullName) {
-      var propValue = props[propName];
-      var propType = getPropType(propValue);
-
-      if (propType !== 'object') {
-        return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` of type `' + propType + '` ' + ('supplied to `' + componentName + '`, expected `object`.'));
-      }
-
-      for (var key in shapeTypes) {
-        var checker = shapeTypes[key];
-
-        if (!checker) {
-          continue;
-        }
-
-        var error = checker(propValue, key, componentName, location, propFullName + '.' + key, ReactPropTypesSecret);
-
-        if (error) {
-          return error;
-        }
-      }
-
-      return null;
-    }
-
-    return createChainableTypeChecker(validate);
-  }
-
-  function createStrictShapeTypeChecker(shapeTypes) {
-    function validate(props, propName, componentName, location, propFullName) {
-      var propValue = props[propName];
-      var propType = getPropType(propValue);
-
-      if (propType !== 'object') {
-        return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` of type `' + propType + '` ' + ('supplied to `' + componentName + '`, expected `object`.'));
-      } // We need to check all keys in case some are required but missing from
-      // props.
-
-
-      var allKeys = assign({}, props[propName], shapeTypes);
-
-      for (var key in allKeys) {
-        var checker = shapeTypes[key];
-
-        if (!checker) {
-          return new PropTypeError('Invalid ' + location + ' `' + propFullName + '` key `' + key + '` supplied to `' + componentName + '`.' + '\nBad object: ' + JSON.stringify(props[propName], null, '  ') + '\nValid keys: ' + JSON.stringify(Object.keys(shapeTypes), null, '  '));
-        }
-
-        var error = checker(propValue, key, componentName, location, propFullName + '.' + key, ReactPropTypesSecret);
-
-        if (error) {
-          return error;
-        }
-      }
-
-      return null;
-    }
-
-    return createChainableTypeChecker(validate);
-  }
-
-  function isNode(propValue) {
-    switch (typeof propValue) {
-      case 'number':
-      case 'string':
-      case 'undefined':
-        return true;
-
-      case 'boolean':
-        return !propValue;
-
-      case 'object':
-        if (Array.isArray(propValue)) {
-          return propValue.every(isNode);
-        }
-
-        if (propValue === null || isValidElement(propValue)) {
-          return true;
-        }
-
-        var iteratorFn = getIteratorFn(propValue);
-
-        if (iteratorFn) {
-          var iterator = iteratorFn.call(propValue);
-          var step;
-
-          if (iteratorFn !== propValue.entries) {
-            while (!(step = iterator.next()).done) {
-              if (!isNode(step.value)) {
-                return false;
-              }
-            }
-          } else {
-            // Iterator will provide entry [k,v] tuples rather than values.
-            while (!(step = iterator.next()).done) {
-              var entry = step.value;
-
-              if (entry) {
-                if (!isNode(entry[1])) {
-                  return false;
-                }
-              }
-            }
-          }
-        } else {
-          return false;
-        }
-
-        return true;
-
-      default:
-        return false;
-    }
-  }
-
-  function isSymbol(propType, propValue) {
-    // Native Symbol.
-    if (propType === 'symbol') {
-      return true;
-    } // falsy value can't be a Symbol
-
-
-    if (!propValue) {
-      return false;
-    } // 19.4.3.5 Symbol.prototype[@@toStringTag] === 'Symbol'
-
-
-    if (propValue['@@toStringTag'] === 'Symbol') {
-      return true;
-    } // Fallback for non-spec compliant Symbols which are polyfilled.
-
-
-    if (typeof Symbol === 'function' && propValue instanceof Symbol) {
-      return true;
-    }
-
-    return false;
-  } // Equivalent of `typeof` but with special handling for array and regexp.
-
-
-  function getPropType(propValue) {
-    var propType = typeof propValue;
-
-    if (Array.isArray(propValue)) {
-      return 'array';
-    }
-
-    if (propValue instanceof RegExp) {
-      // Old webkits (at least until Android 4.0) return 'function' rather than
-      // 'object' for typeof a RegExp. We'll normalize this here so that /bla/
-      // passes PropTypes.object.
-      return 'object';
-    }
-
-    if (isSymbol(propType, propValue)) {
-      return 'symbol';
-    }
-
-    return propType;
-  } // This handles more types than `getPropType`. Only used for error messages.
-  // See `createPrimitiveTypeChecker`.
-
-
-  function getPreciseType(propValue) {
-    if (typeof propValue === 'undefined' || propValue === null) {
-      return '' + propValue;
-    }
-
-    var propType = getPropType(propValue);
-
-    if (propType === 'object') {
-      if (propValue instanceof Date) {
-        return 'date';
-      } else if (propValue instanceof RegExp) {
-        return 'regexp';
-      }
-    }
-
-    return propType;
-  } // Returns a string that is postfixed to a warning about an invalid type.
-  // For example, "undefined" or "of type array"
-
-
-  function getPostfixForTypeWarning(value) {
-    var type = getPreciseType(value);
-
-    switch (type) {
-      case 'array':
-      case 'object':
-        return 'an ' + type;
-
-      case 'boolean':
-      case 'date':
-      case 'regexp':
-        return 'a ' + type;
-
-      default:
-        return type;
-    }
-  } // Returns class name of the object, if any.
-
-
-  function getClassName(propValue) {
-    if (!propValue.constructor || !propValue.constructor.name) {
-      return ANONYMOUS;
-    }
-
-    return propValue.constructor.name;
-  }
-
-  ReactPropTypes.checkPropTypes = checkPropTypes;
-  ReactPropTypes.resetWarningCache = checkPropTypes.resetWarningCache;
-  ReactPropTypes.PropTypes = ReactPropTypes;
-  return ReactPropTypes;
-};
-},{"react-is":"node_modules/react-is/index.js","object-assign":"node_modules/object-assign/index.js","./lib/ReactPropTypesSecret":"node_modules/prop-types/lib/ReactPropTypesSecret.js","./checkPropTypes":"node_modules/prop-types/checkPropTypes.js"}],"node_modules/prop-types/index.js":[function(require,module,exports) {
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-if ("development" !== 'production') {
-  var ReactIs = require('react-is'); // By explicitly using `prop-types` you are opting into new development behavior.
-  // http://fb.me/prop-types-in-prod
-
-
-  var throwOnDirectAccess = true;
-  module.exports = require('./factoryWithTypeCheckers')(ReactIs.isElement, throwOnDirectAccess);
-} else {
-  // By explicitly using `prop-types` you are opting into new production behavior.
-  // http://fb.me/prop-types-in-prod
-  module.exports = require('./factoryWithThrowingShims')();
-}
-},{"react-is":"node_modules/react-is/index.js","./factoryWithTypeCheckers":"node_modules/prop-types/factoryWithTypeCheckers.js"}],"node_modules/classnames/index.js":[function(require,module,exports) {
+  u = null != this.__s && this.__s !== this.state ? this.__s : this.__s = s({}, this.state), "function" == typeof n && (n = n(s({}, u), this.props)), n && s(u, n), null != n && this.__v && (l && this.__h.push(l), k(this));
+}, d.prototype.forceUpdate = function (n) {
+  this.__v && (this.__e = !0, n && this.__h.push(n), k(this));
+}, d.prototype.render = p, u = [], i = "function" == typeof Promise ? Promise.prototype.then.bind(Promise.resolve()) : setTimeout, g.__r = 0, o = f, r = 0;
+},{}],"node_modules/classnames/index.js":[function(require,module,exports) {
 var define;
 /*!
   Copyright (c) 2017 Jed Watson.
@@ -19245,11 +19135,7 @@ exports.default = void 0;
 
 var _preact = require("preact");
 
-var _propTypes = _interopRequireDefault(require("prop-types"));
-
 var _utils = require("../../lib/utils");
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function _typeof(obj) {
   if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") {
@@ -19381,7 +19267,8 @@ function (_Component) {
         templateKey: this.props.templateKey,
         compileOptions: compileOptions,
         helpers: this.props.templatesConfig.helpers,
-        data: this.props.data
+        data: this.props.data,
+        bindEvent: this.props.bindEvent
       });
 
       if (content === null) {
@@ -19410,7 +19297,7 @@ Template.defaultProps = {
 };
 var _default = Template;
 exports.default = _default;
-},{"preact":"node_modules/preact/dist/preact.module.js","prop-types":"node_modules/prop-types/index.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js"}],"node_modules/instantsearch.js/es/components/ClearRefinements/ClearRefinements.js":[function(require,module,exports) {
+},{"preact":"node_modules/preact/dist/preact.module.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js"}],"node_modules/instantsearch.js/es/components/ClearRefinements/ClearRefinements.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -19419,8 +19306,6 @@ Object.defineProperty(exports, "__esModule", {
 exports.default = void 0;
 
 var _preact = require("preact");
-
-var _propTypes = _interopRequireDefault(require("prop-types"));
 
 var _classnames = _interopRequireDefault(require("classnames"));
 
@@ -19486,13 +19371,13 @@ var ClearRefinements = function ClearRefinements(_ref) {
 
 var _default = ClearRefinements;
 exports.default = _default;
-},{"preact":"node_modules/preact/dist/preact.module.js","prop-types":"node_modules/prop-types/index.js","classnames":"node_modules/classnames/index.js","../Template/Template":"node_modules/instantsearch.js/es/components/Template/Template.js"}],"node_modules/instantsearch.js/es/connectors/clear-refinements/connectClearRefinements.js":[function(require,module,exports) {
+},{"preact":"node_modules/preact/dist/preact.module.js","classnames":"node_modules/classnames/index.js","../Template/Template":"node_modules/instantsearch.js/es/components/Template/Template.js"}],"node_modules/instantsearch.js/es/connectors/clear-refinements/connectClearRefinements.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.default = connectClearRefinements;
+exports.default = void 0;
 
 var _utils = require("../../lib/utils");
 
@@ -19518,91 +19403,84 @@ function _arrayWithoutHoles(arr) {
   }
 }
 
+function ownKeys(object, enumerableOnly) {
+  var keys = Object.keys(object);
+
+  if (Object.getOwnPropertySymbols) {
+    var symbols = Object.getOwnPropertySymbols(object);
+    if (enumerableOnly) symbols = symbols.filter(function (sym) {
+      return Object.getOwnPropertyDescriptor(object, sym).enumerable;
+    });
+    keys.push.apply(keys, symbols);
+  }
+
+  return keys;
+}
+
+function _objectSpread(target) {
+  for (var i = 1; i < arguments.length; i++) {
+    var source = arguments[i] != null ? arguments[i] : {};
+
+    if (i % 2) {
+      ownKeys(Object(source), true).forEach(function (key) {
+        _defineProperty(target, key, source[key]);
+      });
+    } else if (Object.getOwnPropertyDescriptors) {
+      Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
+    } else {
+      ownKeys(Object(source)).forEach(function (key) {
+        Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
+      });
+    }
+  }
+
+  return target;
+}
+
+function _defineProperty(obj, key, value) {
+  if (key in obj) {
+    Object.defineProperty(obj, key, {
+      value: value,
+      enumerable: true,
+      configurable: true,
+      writable: true
+    });
+  } else {
+    obj[key] = value;
+  }
+
+  return obj;
+}
+
 var withUsage = (0, _utils.createDocumentationMessageGenerator)({
   name: 'clear-refinements',
   connector: true
 });
-/**
- * @typedef {Object} CustomClearRefinementsWidgetOptions
- * @property {string[]} [includedAttributes = []] The attributes to include in the refinements to clear (all by default). Cannot be used with `excludedAttributes`.
- * @property {string[]} [excludedAttributes = ['query']] The attributes to exclude from the refinements to clear. Cannot be used with `includedAttributes`.
- * @property {function(object[]):object[]} [transformItems] Function to transform the items passed to the templates.
- */
 
-/**
- * @typedef {Object} ClearRefinementsRenderingOptions
- * @property {function} refine Triggers the clear of all the currently refined values.
- * @property {boolean} hasRefinements Indicates if search state is refined.
- * @property {function} createURL Creates a url for the next state when refinements are cleared.
- * @property {Object} widgetParams All original `CustomClearRefinementsWidgetOptions` forwarded to the `renderFn`.
- */
-
-/**
- * **ClearRefinements** connector provides the logic to build a custom widget that will give the user
- * the ability to reset the search state.
- *
- * This connector provides a `refine` function to remove the current refined facets.
- *
- * The behaviour of this function can be changed with widget options. If `clearsQuery`
- * is set to `true`, `refine` will also clear the query and `excludedAttributes` can
- * prevent certain attributes from being cleared.
- *
- * @type {Connector}
- * @param {function(ClearRefinementsRenderingOptions, boolean)} renderFn Rendering function for the custom **ClearRefinements** widget.
- * @param {function} unmountFn Unmount function called when the widget is disposed.
- * @return {function(CustomClearRefinementsWidgetOptions)} Re-usable widget factory for a custom **ClearRefinements** widget.
- * @example
- * // custom `renderFn` to render the custom ClearRefinements widget
- * function renderFn(ClearRefinementsRenderingOptions, isFirstRendering) {
- *   var containerNode = ClearRefinementsRenderingOptions.widgetParams.containerNode;
- *   if (isFirstRendering) {
- *     var markup = $('<button id="custom-clear-all">Clear All</button>');
- *     containerNode.append(markup);
- *
- *     markup.on('click', function(event) {
- *       event.preventDefault();
- *       ClearRefinementsRenderingOptions.refine();
- *     })
- *   }
- *
- *   var clearRefinementsCTA = containerNode.find('#custom-clear-all');
- *   clearRefinementsCTA.attr('disabled', !ClearRefinementsRenderingOptions.hasRefinements)
- * };
- *
- * // connect `renderFn` to ClearRefinements logic
- * var customClearRefinementsWidget = instantsearch.connectors.connectClearRefinements(renderFn);
- *
- * // mount widget on the page
- * search.addWidgets([
- *   customClearRefinementsWidget({
- *     containerNode: $('#custom-clear-all-container'),
- *   })
- * ]);
- */
-
-function connectClearRefinements(renderFn) {
+var connectClearRefinements = function connectClearRefinements(renderFn) {
   var unmountFn = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : _utils.noop;
   (0, _utils.checkRendering)(renderFn, withUsage());
-  return function () {
-    var widgetParams = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  return function (widgetParams) {
+    var _ref = widgetParams || {},
+        _ref$includedAttribut = _ref.includedAttributes,
+        includedAttributes = _ref$includedAttribut === void 0 ? [] : _ref$includedAttribut,
+        _ref$excludedAttribut = _ref.excludedAttributes,
+        excludedAttributes = _ref$excludedAttribut === void 0 ? ['query'] : _ref$excludedAttribut,
+        _ref$transformItems = _ref.transformItems,
+        transformItems = _ref$transformItems === void 0 ? function (items) {
+      return items;
+    } : _ref$transformItems;
 
     if (widgetParams.includedAttributes && widgetParams.excludedAttributes) {
       throw new Error(withUsage('The options `includedAttributes` and `excludedAttributes` cannot be used together.'));
     }
 
-    var _widgetParams$include = widgetParams.includedAttributes,
-        includedAttributes = _widgetParams$include === void 0 ? [] : _widgetParams$include,
-        _widgetParams$exclude = widgetParams.excludedAttributes,
-        excludedAttributes = _widgetParams$exclude === void 0 ? ['query'] : _widgetParams$exclude,
-        _widgetParams$transfo = widgetParams.transformItems,
-        transformItems = _widgetParams$transfo === void 0 ? function (items) {
-      return items;
-    } : _widgetParams$transfo;
     var connectorState = {
       refine: _utils.noop,
       createURL: function createURL() {
         return '';
-      }
+      },
+      attributesToClear: []
     };
 
     var cachedRefine = function cachedRefine() {
@@ -19615,21 +19493,30 @@ function connectClearRefinements(renderFn) {
 
     return {
       $$type: 'ais.clearRefinements',
-      init: function init(_ref) {
-        var instantSearchInstance = _ref.instantSearchInstance;
-        renderFn({
-          hasRefinements: false,
-          refine: cachedRefine,
-          createURL: cachedCreateURL,
-          instantSearchInstance: instantSearchInstance,
-          widgetParams: widgetParams
-        }, true);
+      init: function init(initOptions) {
+        var instantSearchInstance = initOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(initOptions), {
+          instantSearchInstance: instantSearchInstance
+        }), true);
       },
-      render: function render(_ref2) {
-        var scopedResults = _ref2.scopedResults,
-            createURL = _ref2.createURL,
-            instantSearchInstance = _ref2.instantSearchInstance;
-        var attributesToClear = scopedResults.reduce(function (results, scopedResult) {
+      render: function render(renderOptions) {
+        var instantSearchInstance = renderOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(renderOptions), {
+          instantSearchInstance: instantSearchInstance
+        }), false);
+      },
+      dispose: function dispose() {
+        unmountFn();
+      },
+      getRenderState: function getRenderState(renderState, renderOptions) {
+        return _objectSpread({}, renderState, {
+          clearRefinements: this.getWidgetRenderState(renderOptions)
+        });
+      },
+      getWidgetRenderState: function getWidgetRenderState(_ref2) {
+        var createURL = _ref2.createURL,
+            scopedResults = _ref2.scopedResults;
+        connectorState.attributesToClear = scopedResults.reduce(function (results, scopedResult) {
           return results.concat(getAttributesToClear({
             scopedResult: scopedResult,
             includedAttributes: includedAttributes,
@@ -19639,7 +19526,7 @@ function connectClearRefinements(renderFn) {
         }, []);
 
         connectorState.refine = function () {
-          attributesToClear.forEach(function (_ref3) {
+          connectorState.attributesToClear.forEach(function (_ref3) {
             var indexHelper = _ref3.helper,
                 items = _ref3.items;
             indexHelper.setState((0, _utils.clearRefinements)({
@@ -19650,7 +19537,7 @@ function connectClearRefinements(renderFn) {
         };
 
         connectorState.createURL = function () {
-          return createURL(_utils.mergeSearchParameters.apply(void 0, _toConsumableArray(attributesToClear.map(function (_ref4) {
+          return createURL(_utils.mergeSearchParameters.apply(void 0, _toConsumableArray(connectorState.attributesToClear.map(function (_ref4) {
             var indexHelper = _ref4.helper,
                 items = _ref4.items;
             return (0, _utils.clearRefinements)({
@@ -19660,22 +19547,18 @@ function connectClearRefinements(renderFn) {
           }))));
         };
 
-        renderFn({
-          hasRefinements: attributesToClear.some(function (attributeToClear) {
+        return {
+          hasRefinements: connectorState.attributesToClear.some(function (attributeToClear) {
             return attributeToClear.items.length > 0;
           }),
           refine: cachedRefine,
           createURL: cachedCreateURL,
-          instantSearchInstance: instantSearchInstance,
           widgetParams: widgetParams
-        }, false);
-      },
-      dispose: function dispose() {
-        unmountFn();
+        };
       }
     };
   };
-}
+};
 
 function getAttributesToClear(_ref5) {
   var scopedResult = _ref5.scopedResult,
@@ -19700,6 +19583,9 @@ function getAttributesToClear(_ref5) {
     })))
   };
 }
+
+var _default = connectClearRefinements;
+exports.default = _default;
 },{"../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js"}],"node_modules/instantsearch.js/es/widgets/clear-refinements/defaultTemplates.js":[function(require,module,exports) {
 "use strict";
 
@@ -19717,7 +19603,7 @@ exports.default = _default;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.default = clearRefinements;
+exports.default = void 0;
 
 var _preact = require("preact");
 
@@ -19768,52 +19654,10 @@ var renderer = function renderer(_ref) {
     }), containerNode);
   };
 };
-/**
- * @typedef {Object} ClearRefinementsCSSClasses
- * @property {string|string[]} [root] CSS class to add to the wrapper element.
- * @property {string|string[]} [button] CSS class to add to the button of the widget.
- * @property {string|string[]} [disabledButton] CSS class to add to the button when there are no refinements.
- */
 
-/**
- * @typedef {Object} ClearRefinementsTemplates
- * @property {string|string[]} [resetLabel] Template for the content of the button
- */
-
-/**
- * @typedef {Object} ClearRefinementsWidgetOptions
- * @property {string|HTMLElement} container CSS Selector or HTMLElement to insert the widget.
- * @property {string[]} [includedAttributes = []] The attributes to include in the refinements to clear (all by default). Cannot be used with `excludedAttributes`.
- * @property {string[]} [excludedAttributes = ['query']] The attributes to exclude from the refinements to clear. Cannot be used with `includedAttributes`.
- * @property {function(object[]):object[]} [transformItems] Function to transform the items passed to the templates.
- * @property {ClearRefinementsTemplates} [templates] Templates to use for the widget.
- * @property {ClearRefinementsCSSClasses} [cssClasses] CSS classes to be added.
- */
-
-/**
- * The clear all widget gives the user the ability to clear all the refinements currently
- * applied on the results. It is equivalent to the reset button of a form.
- *
- * The current refined values widget can display a button that has the same behavior.
- * @type {WidgetFactory}
- * @devNovel ClearRefinements
- * @category clear-filter
- * @param {ClearRefinementsWidgetOptions} $0 The ClearRefinements widget options.
- * @returns {Widget} A new instance of the ClearRefinements widget.
- * @example
- * search.addWidgets([
- *   instantsearch.widgets.clearRefinements({
- *     container: '#clear-all',
- *     templates: {
- *       resetLabel: 'Reset everything'
- *     },
- *   })
- * ]);
- */
-
-
-function clearRefinements(_ref3) {
-  var container = _ref3.container,
+var clearRefinements = function clearRefinements(widgetOptions) {
+  var _ref3 = widgetOptions || {},
+      container = _ref3.container,
       _ref3$templates = _ref3.templates,
       templates = _ref3$templates === void 0 ? _defaultTemplates.default : _ref3$templates,
       includedAttributes = _ref3.includedAttributes,
@@ -19851,7 +19695,10 @@ function clearRefinements(_ref3) {
     excludedAttributes: excludedAttributes,
     transformItems: transformItems
   });
-}
+};
+
+var _default = clearRefinements;
+exports.default = _default;
 },{"preact":"node_modules/preact/dist/preact.module.js","../../components/ClearRefinements/ClearRefinements":"node_modules/instantsearch.js/es/components/ClearRefinements/ClearRefinements.js","classnames":"node_modules/classnames/index.js","../../connectors/clear-refinements/connectClearRefinements":"node_modules/instantsearch.js/es/connectors/clear-refinements/connectClearRefinements.js","./defaultTemplates":"node_modules/instantsearch.js/es/widgets/clear-refinements/defaultTemplates.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js","../../lib/suit":"node_modules/instantsearch.js/es/lib/suit.js"}],"node_modules/instantsearch.js/es/connectors/configure/connectConfigure.js":[function(require,module,exports) {
 "use strict";
 
@@ -19885,13 +19732,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -19915,6 +19762,9 @@ function _defineProperty(obj, key, value) {
   return obj;
 }
 
+/**
+ * Refine the given search parameters.
+ */
 var withUsage = (0, _utils.createDocumentationMessageGenerator)({
   name: 'configure',
   connector: true
@@ -19943,44 +19793,62 @@ var connectConfigure = function connectConfigure() {
       return function (searchParameters) {
         // Merge new `searchParameters` with the ones set from other widgets
         var actualState = getInitialSearchParameters(helper.state, widgetParams);
-        var nextSearchParameters = (0, _utils.mergeSearchParameters)(actualState, new _algoliasearchHelper.default.SearchParameters(searchParameters)); // Trigger a search with the resolved search parameters
+        var nextSearchParameters = (0, _utils.mergeSearchParameters)(actualState, new _algoliasearchHelper.default.SearchParameters(searchParameters)); // Update original `widgetParams.searchParameters` to the new refined one
 
-        helper.setState(nextSearchParameters).search(); // Update original `widgetParams.searchParameters` to the new refined one
+        widgetParams.searchParameters = searchParameters; // Trigger a search with the resolved search parameters
 
-        widgetParams.searchParameters = searchParameters;
+        helper.setState(nextSearchParameters).search();
       };
     }
 
     return {
       $$type: 'ais.configure',
-      init: function init(_ref) {
-        var instantSearchInstance = _ref.instantSearchInstance,
-            helper = _ref.helper;
-        connectorState.refine = refine(helper);
-        renderFn({
-          refine: connectorState.refine,
-          instantSearchInstance: instantSearchInstance,
-          widgetParams: widgetParams
-        }, true);
+      init: function init(initOptions) {
+        var instantSearchInstance = initOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(initOptions), {
+          instantSearchInstance: instantSearchInstance
+        }), true);
       },
-      render: function render(_ref2) {
-        var instantSearchInstance = _ref2.instantSearchInstance;
-        renderFn({
-          refine: connectorState.refine,
-          instantSearchInstance: instantSearchInstance,
-          widgetParams: widgetParams
-        }, false);
+      render: function render(renderOptions) {
+        var instantSearchInstance = renderOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(renderOptions), {
+          instantSearchInstance: instantSearchInstance
+        }), false);
       },
-      dispose: function dispose(_ref3) {
-        var state = _ref3.state;
+      dispose: function dispose(_ref) {
+        var state = _ref.state;
         unmountFn();
         return getInitialSearchParameters(state, widgetParams);
       },
-      getWidgetSearchParameters: function getWidgetSearchParameters(state, _ref4) {
-        var uiState = _ref4.uiState;
+      getRenderState: function getRenderState(renderState, renderOptions) {
+        var _renderState$configur;
+
+        var widgetRenderState = this.getWidgetRenderState(renderOptions);
+        return _objectSpread({}, renderState, {
+          configure: _objectSpread({}, widgetRenderState, {
+            widgetParams: _objectSpread({}, widgetRenderState.widgetParams, {
+              searchParameters: (0, _utils.mergeSearchParameters)(new _algoliasearchHelper.default.SearchParameters((_renderState$configur = renderState.configure) === null || _renderState$configur === void 0 ? void 0 : _renderState$configur.widgetParams.searchParameters), new _algoliasearchHelper.default.SearchParameters(widgetRenderState.widgetParams.searchParameters)).getQueryParams()
+            })
+          })
+        });
+      },
+      getWidgetRenderState: function getWidgetRenderState(_ref2) {
+        var helper = _ref2.helper;
+
+        if (!connectorState.refine) {
+          connectorState.refine = refine(helper);
+        }
+
+        return {
+          refine: connectorState.refine,
+          widgetParams: widgetParams
+        };
+      },
+      getWidgetSearchParameters: function getWidgetSearchParameters(state, _ref3) {
+        var uiState = _ref3.uiState;
         return (0, _utils.mergeSearchParameters)(state, new _algoliasearchHelper.default.SearchParameters(_objectSpread({}, uiState.configure, {}, widgetParams.searchParameters)));
       },
-      getWidgetState: function getWidgetState(uiState) {
+      getWidgetUiState: function getWidgetUiState(uiState) {
         return _objectSpread({}, uiState, {
           configure: _objectSpread({}, uiState.configure, {}, widgetParams.searchParameters)
         });
@@ -20001,12 +19869,18 @@ exports.default = void 0;
 
 var _connectConfigure = _interopRequireDefault(require("../../connectors/configure/connectConfigure"));
 
+var _utils = require("../../lib/utils");
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+/**
+ * A list of [search parameters](https://www.algolia.com/doc/api-reference/search-api-parameters/)
+ * to enable when the widget mounts.
+ */
 var configure = function configure(widgetParams) {
   // This is a renderless widget that falls back to the connector's
   // noop render and unmount functions.
-  var makeWidget = (0, _connectConfigure.default)();
+  var makeWidget = (0, _connectConfigure.default)(_utils.noop);
   return makeWidget({
     searchParameters: widgetParams
   });
@@ -20014,7 +19888,189 @@ var configure = function configure(widgetParams) {
 
 var _default = configure;
 exports.default = _default;
-},{"../../connectors/configure/connectConfigure":"node_modules/instantsearch.js/es/connectors/configure/connectConfigure.js"}],"node_modules/instantsearch.js/es/components/CurrentRefinements/CurrentRefinements.js":[function(require,module,exports) {
+},{"../../connectors/configure/connectConfigure":"node_modules/instantsearch.js/es/connectors/configure/connectConfigure.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js"}],"node_modules/instantsearch.js/es/connectors/configure-related-items/connectConfigureRelatedItems.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _algoliasearchHelper = _interopRequireDefault(require("algoliasearch-helper"));
+
+var _utils = require("../../lib/utils");
+
+var _connectConfigure = _interopRequireDefault(require("../configure/connectConfigure"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function ownKeys(object, enumerableOnly) {
+  var keys = Object.keys(object);
+
+  if (Object.getOwnPropertySymbols) {
+    var symbols = Object.getOwnPropertySymbols(object);
+    if (enumerableOnly) symbols = symbols.filter(function (sym) {
+      return Object.getOwnPropertyDescriptor(object, sym).enumerable;
+    });
+    keys.push.apply(keys, symbols);
+  }
+
+  return keys;
+}
+
+function _objectSpread(target) {
+  for (var i = 1; i < arguments.length; i++) {
+    var source = arguments[i] != null ? arguments[i] : {};
+
+    if (i % 2) {
+      ownKeys(Object(source), true).forEach(function (key) {
+        _defineProperty(target, key, source[key]);
+      });
+    } else if (Object.getOwnPropertyDescriptors) {
+      Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
+    } else {
+      ownKeys(Object(source)).forEach(function (key) {
+        Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
+      });
+    }
+  }
+
+  return target;
+}
+
+function _defineProperty(obj, key, value) {
+  if (key in obj) {
+    Object.defineProperty(obj, key, {
+      value: value,
+      enumerable: true,
+      configurable: true,
+      writable: true
+    });
+  } else {
+    obj[key] = value;
+  }
+
+  return obj;
+}
+
+function _toConsumableArray(arr) {
+  return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _nonIterableSpread();
+}
+
+function _nonIterableSpread() {
+  throw new TypeError("Invalid attempt to spread non-iterable instance");
+}
+
+function _iterableToArray(iter) {
+  if (Symbol.iterator in Object(iter) || Object.prototype.toString.call(iter) === "[object Arguments]") return Array.from(iter);
+}
+
+function _arrayWithoutHoles(arr) {
+  if (Array.isArray(arr)) {
+    for (var i = 0, arr2 = new Array(arr.length); i < arr.length; i++) {
+      arr2[i] = arr[i];
+    }
+
+    return arr2;
+  }
+}
+
+var withUsage = (0, _utils.createDocumentationMessageGenerator)({
+  name: 'configure-related-items',
+  connector: true
+});
+
+function createOptionalFilter(_ref) {
+  var attributeName = _ref.attributeName,
+      attributeValue = _ref.attributeValue,
+      attributeScore = _ref.attributeScore;
+  return "".concat(attributeName, ":").concat(attributeValue, "<score=").concat(attributeScore || 1, ">");
+}
+
+var connectConfigureRelatedItems = function connectConfigureRelatedItems(renderFn, unmountFn) {
+  return function (widgetParams) {
+    var _ref2 = widgetParams || {},
+        hit = _ref2.hit,
+        matchingPatterns = _ref2.matchingPatterns,
+        _ref2$transformSearch = _ref2.transformSearchParameters,
+        transformSearchParameters = _ref2$transformSearch === void 0 ? function (x) {
+      return x;
+    } : _ref2$transformSearch;
+
+    if (!hit) {
+      throw new Error(withUsage('The `hit` option is required.'));
+    }
+
+    if (!matchingPatterns) {
+      throw new Error(withUsage('The `matchingPatterns` option is required.'));
+    }
+
+    var optionalFilters = Object.keys(matchingPatterns).reduce(function (acc, attributeName) {
+      var attribute = matchingPatterns[attributeName];
+      var attributeValue = (0, _utils.getPropertyByPath)(hit, attributeName);
+      var attributeScore = attribute.score;
+
+      if (Array.isArray(attributeValue)) {
+        return [].concat(_toConsumableArray(acc), [attributeValue.map(function (attributeSubValue) {
+          return createOptionalFilter({
+            attributeName: attributeName,
+            attributeValue: attributeSubValue,
+            attributeScore: attributeScore
+          });
+        })]);
+      }
+
+      if (typeof attributeValue === 'string') {
+        return [].concat(_toConsumableArray(acc), [createOptionalFilter({
+          attributeName: attributeName,
+          attributeValue: attributeValue,
+          attributeScore: attributeScore
+        })]);
+      }
+
+      "development" === 'development' ? (0, _utils.warning)(false, "\nThe `matchingPatterns` option returned a value of type ".concat((0, _utils.getObjectType)(attributeValue), " for the \"").concat(attributeName, "\" key. This value was not sent to Algolia because `optionalFilters` only supports strings and array of strings.\n\nYou can remove the \"").concat(attributeName, "\" key from the `matchingPatterns` option.\n\nSee https://www.algolia.com/doc/api-reference/api-parameters/optionalFilters/\n            ")) : void 0;
+      return acc;
+    }, []);
+
+    var searchParameters = _objectSpread({}, transformSearchParameters(new _algoliasearchHelper.default.SearchParameters({
+      sumOrFiltersScores: true,
+      facetFilters: ["objectID:-".concat(hit.objectID)],
+      optionalFilters: optionalFilters
+    })));
+
+    var makeConfigure = (0, _connectConfigure.default)(renderFn, unmountFn);
+    return _objectSpread({}, makeConfigure({
+      searchParameters: searchParameters
+    }), {
+      $$type: 'ais.configureRelatedItems'
+    });
+  };
+};
+
+var _default = connectConfigureRelatedItems;
+exports.default = _default;
+},{"algoliasearch-helper":"node_modules/algoliasearch-helper/index.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js","../configure/connectConfigure":"node_modules/instantsearch.js/es/connectors/configure/connectConfigure.js"}],"node_modules/instantsearch.js/es/widgets/configure-related-items/configure-related-items.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _utils = require("../../lib/utils");
+
+var _connectConfigureRelatedItems = _interopRequireDefault(require("../../connectors/configure-related-items/connectConfigureRelatedItems"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var configureRelatedItems = function configureRelatedItems(widgetParams) {
+  var makeWidget = (0, _connectConfigureRelatedItems.default)(_utils.noop);
+  return makeWidget(widgetParams);
+};
+
+var _default = configureRelatedItems;
+exports.default = _default;
+},{"../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js","../../connectors/configure-related-items/connectConfigureRelatedItems":"node_modules/instantsearch.js/es/connectors/configure-related-items/connectConfigureRelatedItems.js"}],"node_modules/instantsearch.js/es/components/CurrentRefinements/CurrentRefinements.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -20109,6 +20165,55 @@ function _arrayWithoutHoles(arr) {
   }
 }
 
+function ownKeys(object, enumerableOnly) {
+  var keys = Object.keys(object);
+
+  if (Object.getOwnPropertySymbols) {
+    var symbols = Object.getOwnPropertySymbols(object);
+    if (enumerableOnly) symbols = symbols.filter(function (sym) {
+      return Object.getOwnPropertyDescriptor(object, sym).enumerable;
+    });
+    keys.push.apply(keys, symbols);
+  }
+
+  return keys;
+}
+
+function _objectSpread(target) {
+  for (var i = 1; i < arguments.length; i++) {
+    var source = arguments[i] != null ? arguments[i] : {};
+
+    if (i % 2) {
+      ownKeys(Object(source), true).forEach(function (key) {
+        _defineProperty(target, key, source[key]);
+      });
+    } else if (Object.getOwnPropertyDescriptors) {
+      Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
+    } else {
+      ownKeys(Object(source)).forEach(function (key) {
+        Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
+      });
+    }
+  }
+
+  return target;
+}
+
+function _defineProperty(obj, key, value) {
+  if (key in obj) {
+    Object.defineProperty(obj, key, {
+      value: value,
+      enumerable: true,
+      configurable: true,
+      writable: true
+    });
+  } else {
+    obj[key] = value;
+  }
+
+  return obj;
+}
+
 var withUsage = (0, _utils.createDocumentationMessageGenerator)({
   name: 'current-refinements',
   connector: true
@@ -20133,85 +20238,72 @@ var connectCurrentRefinements = function connectCurrentRefinements(renderFn) {
 
     return {
       $$type: 'ais.currentRefinements',
-      init: function init(_ref2) {
-        var helper = _ref2.helper,
-            createURL = _ref2.createURL,
-            instantSearchInstance = _ref2.instantSearchInstance;
-        var items = transformItems(getItems({
-          results: {},
-          helper: helper,
-          includedAttributes: includedAttributes,
-          excludedAttributes: excludedAttributes
-        }));
-        renderFn({
-          items: items,
-          refine: function refine(refinement) {
-            return clearRefinement(helper, refinement);
-          },
-          createURL: function (_createURL) {
-            function createURL(_x) {
-              return _createURL.apply(this, arguments);
-            }
-
-            createURL.toString = function () {
-              return _createURL.toString();
-            };
-
-            return createURL;
-          }(function (refinement) {
-            return createURL(clearRefinementFromState(helper.state, refinement));
-          }),
-          instantSearchInstance: instantSearchInstance,
-          widgetParams: widgetParams
-        }, true);
+      init: function init(initOptions) {
+        var instantSearchInstance = initOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(initOptions), {
+          instantSearchInstance: instantSearchInstance
+        }), true);
       },
-      render: function render(_ref3) {
-        var scopedResults = _ref3.scopedResults,
-            helper = _ref3.helper,
-            createURL = _ref3.createURL,
-            instantSearchInstance = _ref3.instantSearchInstance;
-        var items = scopedResults.reduce(function (results, scopedResult) {
-          return results.concat(transformItems(getItems({
-            results: scopedResult.results,
-            helper: scopedResult.helper,
-            includedAttributes: includedAttributes,
-            excludedAttributes: excludedAttributes
-          })));
-        }, []);
-        renderFn({
-          items: items,
-          refine: function refine(refinement) {
-            return clearRefinement(helper, refinement);
-          },
-          createURL: function (_createURL2) {
-            function createURL(_x2) {
-              return _createURL2.apply(this, arguments);
-            }
-
-            createURL.toString = function () {
-              return _createURL2.toString();
-            };
-
-            return createURL;
-          }(function (refinement) {
-            return createURL(clearRefinementFromState(helper.state, refinement));
-          }),
-          instantSearchInstance: instantSearchInstance,
-          widgetParams: widgetParams
-        }, false);
+      render: function render(renderOptions) {
+        var instantSearchInstance = renderOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(renderOptions), {
+          instantSearchInstance: instantSearchInstance
+        }), false);
       },
       dispose: function dispose() {
         unmountFn();
+      },
+      getRenderState: function getRenderState(renderState, renderOptions) {
+        return _objectSpread({}, renderState, {
+          currentRefinements: this.getWidgetRenderState(renderOptions)
+        });
+      },
+      getWidgetRenderState: function getWidgetRenderState(_ref2) {
+        var results = _ref2.results,
+            scopedResults = _ref2.scopedResults,
+            _createURL = _ref2.createURL,
+            helper = _ref2.helper;
+
+        function getItems() {
+          if (!results) {
+            return transformItems(getRefinementsItems({
+              results: {},
+              helper: helper,
+              includedAttributes: includedAttributes,
+              excludedAttributes: excludedAttributes
+            }));
+          }
+
+          return scopedResults.reduce(function (accResults, scopedResult) {
+            return accResults.concat(transformItems(getRefinementsItems({
+              results: scopedResult.results,
+              helper: scopedResult.helper,
+              includedAttributes: includedAttributes,
+              excludedAttributes: excludedAttributes
+            })));
+          }, []);
+        }
+
+        return {
+          items: getItems(),
+          refine: function refine(refinement) {
+            return clearRefinement(helper, refinement);
+          },
+          createURL: function createURL(refinement) {
+            return _createURL(clearRefinementFromState(helper.state, refinement));
+          },
+          widgetParams: widgetParams
+        };
       }
     };
   };
 };
 
-function getItems(_ref4) {
-  var results = _ref4.results,
-      helper = _ref4.helper,
-      includedAttributes = _ref4.includedAttributes,
-      excludedAttributes = _ref4.excludedAttributes;
+function getRefinementsItems(_ref3) {
+  var results = _ref3.results,
+      helper = _ref3.helper,
+      includedAttributes = _ref3.includedAttributes,
+      excludedAttributes = _ref3.excludedAttributes;
   var clearsQuery = (includedAttributes || []).indexOf('query') !== -1 || (excludedAttributes || []).indexOf('query') === -1;
   var filterFunction = includedAttributes ? function (item) {
     return includedAttributes.indexOf(item.attribute) !== -1;
@@ -20242,22 +20334,22 @@ function getItems(_ref4) {
 function clearRefinementFromState(state, refinement) {
   switch (refinement.type) {
     case 'facet':
-      return state.removeFacetRefinement(refinement.attribute, refinement.value);
+      return state.removeFacetRefinement(refinement.attribute, String(refinement.value));
 
     case 'disjunctive':
-      return state.removeDisjunctiveFacetRefinement(refinement.attribute, refinement.value);
+      return state.removeDisjunctiveFacetRefinement(refinement.attribute, String(refinement.value));
 
     case 'hierarchical':
       return state.removeHierarchicalFacetRefinement(refinement.attribute);
 
     case 'exclude':
-      return state.removeExcludeRefinement(refinement.attribute, refinement.value);
+      return state.removeExcludeRefinement(refinement.attribute, String(refinement.value));
 
     case 'numeric':
-      return state.removeNumericRefinement(refinement.attribute, refinement.operator, refinement.value);
+      return state.removeNumericRefinement(refinement.attribute, refinement.operator, String(refinement.value));
 
     case 'tag':
-      return state.removeTagRefinement(refinement.value);
+      return state.removeTagRefinement(String(refinement.value));
 
     case 'query':
       return state.setQueryParameter('query', '');
@@ -20356,8 +20448,9 @@ var renderer = function renderer(_ref, isFirstRender) {
   }), container);
 };
 
-var currentRefinements = function currentRefinements(_ref2) {
-  var container = _ref2.container,
+var currentRefinements = function currentRefinements(widgetParams) {
+  var _ref2 = widgetParams || {},
+      container = _ref2.container,
       includedAttributes = _ref2.includedAttributes,
       excludedAttributes = _ref2.excludedAttributes,
       _ref2$cssClasses = _ref2.cssClasses,
@@ -20433,13 +20526,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -20467,6 +20560,7 @@ var withUsage = (0, _utils.createDocumentationMessageGenerator)({
   name: 'geo-search',
   connector: true
 });
+var $$type = 'ais.geoSearch';
 /**
  * @typedef {Object} LatLng
  * @property {number} lat The latitude in degrees.
@@ -20510,7 +20604,6 @@ var withUsage = (0, _utils.createDocumentationMessageGenerator)({
  *
  * Currently, the feature is not compatible with multiple values in the _geoloc attribute.
  *
- * @type {Connector}
  * @param {function(GeoSearchRenderingOptions, boolean)} renderFn Rendering function for the custom **GeoSearch** widget.
  * @param {function} unmountFn Unmount function called when the widget is disposed.
  * @return {function(CustomGeoSearchWidgetOptions)} Re-usable widget factory for a custom **GeoSearch** widget.
@@ -20571,6 +20664,7 @@ var connectGeoSearch = function connectGeoSearch(renderFn) {
     } : _widgetParams$transfo;
     var widgetState = {
       isRefineOnMapMove: enableRefineOnMapMove,
+      // @MAJOR hasMapMoveSinceLastRefine -> hasMapMovedSinceLastRefine
       hasMapMoveSinceLastRefine: false,
       lastRefinePosition: '',
       lastRefineBoundingBox: '',
@@ -20643,77 +20737,85 @@ var connectGeoSearch = function connectGeoSearch(renderFn) {
       return widgetState.hasMapMoveSinceLastRefine;
     };
 
-    var init = function init(initArgs) {
-      var state = initArgs.state,
-          helper = initArgs.helper,
-          instantSearchInstance = initArgs.instantSearchInstance;
-      var isFirstRendering = true;
-      widgetState.internalToggleRefineOnMapMove = createInternalToggleRefinementOnMapMove(_utils.noop, initArgs);
-      widgetState.internalSetMapMoveSinceLastRefine = createInternalSetMapMoveSinceLastRefine(_utils.noop, initArgs);
-      renderFn({
-        items: [],
-        position: getPositionFromState(state),
-        currentRefinement: getCurrentRefinementFromState(state),
-        refine: refine(helper),
-        clearMapRefinement: clearMapRefinement(helper),
-        isRefinedWithMap: isRefinedWithMap(state),
-        toggleRefineOnMapMove: toggleRefineOnMapMove,
-        isRefineOnMapMove: isRefineOnMapMove,
-        setMapMoveSinceLastRefine: setMapMoveSinceLastRefine,
-        hasMapMoveSinceLastRefine: hasMapMoveSinceLastRefine,
-        widgetParams: widgetParams,
-        instantSearchInstance: instantSearchInstance
-      }, isFirstRendering);
-    };
-
-    var render = function render(renderArgs) {
-      var results = renderArgs.results,
-          helper = renderArgs.helper,
-          instantSearchInstance = renderArgs.instantSearchInstance;
-      var isFirstRendering = false; // We don't use the state provided by the render function because we need
-      // to be sure that the state is the latest one for the following condition
-
-      var state = helper.state;
-      var positionChangedSinceLastRefine = Boolean(state.aroundLatLng) && Boolean(widgetState.lastRefinePosition) && state.aroundLatLng !== widgetState.lastRefinePosition;
-      var boundingBoxChangedSinceLastRefine = !state.insideBoundingBox && Boolean(widgetState.lastRefineBoundingBox) && state.insideBoundingBox !== widgetState.lastRefineBoundingBox;
-
-      if (positionChangedSinceLastRefine || boundingBoxChangedSinceLastRefine) {
-        widgetState.hasMapMoveSinceLastRefine = false;
-      }
-
-      widgetState.lastRefinePosition = state.aroundLatLng || '';
-      widgetState.lastRefineBoundingBox = state.insideBoundingBox || '';
-      widgetState.internalToggleRefineOnMapMove = createInternalToggleRefinementOnMapMove(render, renderArgs);
-      widgetState.internalSetMapMoveSinceLastRefine = createInternalSetMapMoveSinceLastRefine(render, renderArgs);
-      var items = transformItems(results.hits.filter(function (hit) {
-        return hit._geoloc;
-      }));
-      renderFn({
-        items: items,
-        position: getPositionFromState(state),
-        currentRefinement: getCurrentRefinementFromState(state),
-        refine: refine(helper),
-        clearMapRefinement: clearMapRefinement(helper),
-        isRefinedWithMap: isRefinedWithMap(state),
-        toggleRefineOnMapMove: toggleRefineOnMapMove,
-        isRefineOnMapMove: isRefineOnMapMove,
-        setMapMoveSinceLastRefine: setMapMoveSinceLastRefine,
-        hasMapMoveSinceLastRefine: hasMapMoveSinceLastRefine,
-        widgetParams: widgetParams,
-        instantSearchInstance: instantSearchInstance
-      }, isFirstRendering);
-    };
-
+    var sendEvent;
     return {
-      $$type: 'ais.geoSearch',
-      init: init,
-      render: render,
+      $$type: $$type,
+      init: function init(initArgs) {
+        var instantSearchInstance = initArgs.instantSearchInstance;
+        var isFirstRendering = true;
+        widgetState.internalToggleRefineOnMapMove = createInternalToggleRefinementOnMapMove(_utils.noop, initArgs);
+        widgetState.internalSetMapMoveSinceLastRefine = createInternalSetMapMoveSinceLastRefine(_utils.noop, initArgs);
+        renderFn(_objectSpread({}, this.getWidgetRenderState(initArgs), {
+          instantSearchInstance: instantSearchInstance
+        }), isFirstRendering);
+      },
+      render: function render(renderArgs) {
+        var helper = renderArgs.helper,
+            instantSearchInstance = renderArgs.instantSearchInstance;
+        var isFirstRendering = false; // We don't use the state provided by the render function because we need
+        // to be sure that the state is the latest one for the following condition
+
+        var state = helper.state;
+        var positionChangedSinceLastRefine = Boolean(state.aroundLatLng) && Boolean(widgetState.lastRefinePosition) && state.aroundLatLng !== widgetState.lastRefinePosition;
+        var boundingBoxChangedSinceLastRefine = !state.insideBoundingBox && Boolean(widgetState.lastRefineBoundingBox) && state.insideBoundingBox !== widgetState.lastRefineBoundingBox;
+
+        if (positionChangedSinceLastRefine || boundingBoxChangedSinceLastRefine) {
+          widgetState.hasMapMoveSinceLastRefine = false;
+        }
+
+        widgetState.lastRefinePosition = state.aroundLatLng || '';
+        widgetState.lastRefineBoundingBox = state.insideBoundingBox || '';
+        widgetState.internalToggleRefineOnMapMove = createInternalToggleRefinementOnMapMove(this.render.bind(this), renderArgs);
+        widgetState.internalSetMapMoveSinceLastRefine = createInternalSetMapMoveSinceLastRefine(this.render.bind(this), renderArgs);
+        var widgetRenderState = this.getWidgetRenderState(renderArgs);
+        sendEvent('view', widgetRenderState.items);
+        renderFn(_objectSpread({}, widgetRenderState, {
+          instantSearchInstance: instantSearchInstance
+        }), isFirstRendering);
+      },
+      getWidgetRenderState: function getWidgetRenderState(renderOptions) {
+        var helper = renderOptions.helper,
+            results = renderOptions.results,
+            instantSearchInstance = renderOptions.instantSearchInstance;
+        var state = helper.state;
+        var items = results ? transformItems(results.hits.filter(function (hit) {
+          return hit._geoloc;
+        })) : [];
+
+        if (!sendEvent) {
+          sendEvent = (0, _utils.createSendEventForHits)({
+            instantSearchInstance: instantSearchInstance,
+            index: helper.getIndex(),
+            widgetType: $$type
+          });
+        }
+
+        return {
+          items: items,
+          position: getPositionFromState(state),
+          currentRefinement: getCurrentRefinementFromState(state),
+          refine: refine(helper),
+          sendEvent: sendEvent,
+          clearMapRefinement: clearMapRefinement(helper),
+          isRefinedWithMap: isRefinedWithMap(state),
+          toggleRefineOnMapMove: toggleRefineOnMapMove,
+          isRefineOnMapMove: isRefineOnMapMove,
+          setMapMoveSinceLastRefine: setMapMoveSinceLastRefine,
+          hasMapMoveSinceLastRefine: hasMapMoveSinceLastRefine,
+          widgetParams: widgetParams
+        };
+      },
+      getRenderState: function getRenderState(renderState, renderOptions) {
+        return _objectSpread({}, renderState, {
+          geoSearch: this.getWidgetRenderState(renderOptions)
+        });
+      },
       dispose: function dispose(_ref2) {
         var state = _ref2.state;
         unmountFn();
         return state.setQueryParameter('insideBoundingBox', undefined);
       },
-      getWidgetState: function getWidgetState(uiState, _ref3) {
+      getWidgetUiState: function getWidgetUiState(uiState, _ref3) {
         var searchParameters = _ref3.searchParameters;
         var boundingBox = searchParameters.insideBoundingBox;
 
@@ -20752,10 +20854,6 @@ exports.default = void 0;
 
 var _preact = require("preact");
 
-var _propTypes = _interopRequireDefault(require("prop-types"));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
 /** @jsx h */
 var GeoSearchButton = function GeoSearchButton(_ref) {
   var className = _ref.className,
@@ -20774,7 +20872,7 @@ GeoSearchButton.defaultProps = {
 };
 var _default = GeoSearchButton;
 exports.default = _default;
-},{"preact":"node_modules/preact/dist/preact.module.js","prop-types":"node_modules/prop-types/index.js"}],"node_modules/instantsearch.js/es/components/GeoSearchControls/GeoSearchToggle.js":[function(require,module,exports) {
+},{"preact":"node_modules/preact/dist/preact.module.js"}],"node_modules/instantsearch.js/es/components/GeoSearchControls/GeoSearchToggle.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -20783,10 +20881,6 @@ Object.defineProperty(exports, "__esModule", {
 exports.default = void 0;
 
 var _preact = require("preact");
-
-var _propTypes = _interopRequireDefault(require("prop-types"));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 /** @jsx h */
 var GeoSearchToggle = function GeoSearchToggle(_ref) {
@@ -20807,7 +20901,7 @@ var GeoSearchToggle = function GeoSearchToggle(_ref) {
 
 var _default = GeoSearchToggle;
 exports.default = _default;
-},{"preact":"node_modules/preact/dist/preact.module.js","prop-types":"node_modules/prop-types/index.js"}],"node_modules/instantsearch.js/es/components/GeoSearchControls/GeoSearchControls.js":[function(require,module,exports) {
+},{"preact":"node_modules/preact/dist/preact.module.js"}],"node_modules/instantsearch.js/es/components/GeoSearchControls/GeoSearchControls.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -20816,8 +20910,6 @@ Object.defineProperty(exports, "__esModule", {
 exports.default = void 0;
 
 var _preact = require("preact");
-
-var _propTypes = _interopRequireDefault(require("prop-types"));
 
 var _classnames = _interopRequireDefault(require("classnames"));
 
@@ -20913,7 +21005,7 @@ var GeoSearchControls = function GeoSearchControls(_ref) {
 
 var _default = GeoSearchControls;
 exports.default = _default;
-},{"preact":"node_modules/preact/dist/preact.module.js","prop-types":"node_modules/prop-types/index.js","classnames":"node_modules/classnames/index.js","../Template/Template":"node_modules/instantsearch.js/es/components/Template/Template.js","./GeoSearchButton":"node_modules/instantsearch.js/es/components/GeoSearchControls/GeoSearchButton.js","./GeoSearchToggle":"node_modules/instantsearch.js/es/components/GeoSearchControls/GeoSearchToggle.js"}],"node_modules/instantsearch.js/es/widgets/geo-search/GeoSearchRenderer.js":[function(require,module,exports) {
+},{"preact":"node_modules/preact/dist/preact.module.js","classnames":"node_modules/classnames/index.js","../Template/Template":"node_modules/instantsearch.js/es/components/Template/Template.js","./GeoSearchButton":"node_modules/instantsearch.js/es/components/GeoSearchControls/GeoSearchButton.js","./GeoSearchToggle":"node_modules/instantsearch.js/es/components/GeoSearchControls/GeoSearchToggle.js"}],"node_modules/instantsearch.js/es/widgets/geo-search/GeoSearchRenderer.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -20948,13 +21040,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -21288,19 +21380,19 @@ function _possibleConstructorReturn(self, call) {
   return _assertThisInitialized(self);
 }
 
+function _getPrototypeOf(o) {
+  _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf : function _getPrototypeOf(o) {
+    return o.__proto__ || Object.getPrototypeOf(o);
+  };
+  return _getPrototypeOf(o);
+}
+
 function _assertThisInitialized(self) {
   if (self === void 0) {
     throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
   }
 
   return self;
-}
-
-function _getPrototypeOf(o) {
-  _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf : function _getPrototypeOf(o) {
-    return o.__proto__ || Object.getPrototypeOf(o);
-  };
-  return _getPrototypeOf(o);
 }
 
 function _inherits(subClass, superClass) {
@@ -21327,6 +21419,22 @@ function _setPrototypeOf(o, p) {
   return _setPrototypeOf(o, p);
 }
 
+function _defineProperty(obj, key, value) {
+  if (key in obj) {
+    Object.defineProperty(obj, key, {
+      value: value,
+      enumerable: true,
+      configurable: true,
+      writable: true
+    });
+  } else {
+    obj[key] = value;
+  }
+
+  return obj;
+} // eslint-disable-next-line no-undef
+
+
 var createHTMLMarker = function createHTMLMarker(googleReference) {
   var HTMLMarker =
   /*#__PURE__*/
@@ -21350,6 +21458,19 @@ var createHTMLMarker = function createHTMLMarker(googleReference) {
       _classCallCheck(this, HTMLMarker);
 
       _this = _possibleConstructorReturn(this, _getPrototypeOf(HTMLMarker).call(this));
+
+      _defineProperty(_assertThisInitialized(_this), "__id", void 0);
+
+      _defineProperty(_assertThisInitialized(_this), "anchor", void 0);
+
+      _defineProperty(_assertThisInitialized(_this), "offset", void 0);
+
+      _defineProperty(_assertThisInitialized(_this), "listeners", void 0);
+
+      _defineProperty(_assertThisInitialized(_this), "latLng", void 0);
+
+      _defineProperty(_assertThisInitialized(_this), "element", void 0);
+
       _this.__id = __id;
       _this.anchor = anchor;
       _this.listeners = {};
@@ -21389,7 +21510,7 @@ var createHTMLMarker = function createHTMLMarker(googleReference) {
         this.element.style.top = "".concat(Math.round(position.y - this.offset.y), "px"); // Markers to the south are in front of markers to the north
         // This is the default behaviour of Google Maps
 
-        this.element.style.zIndex = parseInt(this.element.style.top, 10);
+        this.element.style.zIndex = String(parseInt(this.element.style.top, 10));
       }
     }, {
       key: "onRemove",
@@ -21409,7 +21530,13 @@ var createHTMLMarker = function createHTMLMarker(googleReference) {
       key: "addListener",
       value: function addListener(eventName, listener) {
         this.listeners[eventName] = listener;
-        this.element.addEventListener(eventName, listener);
+        var element = this.element;
+        element.addEventListener(eventName, listener);
+        return {
+          remove: function remove() {
+            return element.removeEventListener(eventName, listener);
+          }
+        };
       }
     }, {
       key: "getPosition",
@@ -21419,7 +21546,9 @@ var createHTMLMarker = function createHTMLMarker(googleReference) {
     }]);
 
     return HTMLMarker;
-  }(googleReference.maps.OverlayView);
+  }(googleReference.maps.OverlayView); // we have to cast this to a regular OverlayView to prevent internal class being exposed
+  // which TypeScript doesn't allow.
+
 
   return HTMLMarker;
 };
@@ -21471,13 +21600,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -21619,7 +21748,6 @@ var suit = (0, _suit.component)('GeoSearch');
  *
  * Don't forget to explicitly set the `height` of the map container (default class `.ais-geo-search--map`), otherwise it won't be shown (it's a requirement of Google Maps).
  *
- * @type {WidgetFactory}
  * @devNovel GeoSearch
  * @param {GeoSearchWidgetOptions} $0 Options of the GeoSearch widget.
  * @return {Widget} A new instance of GeoSearch widget.
@@ -21782,8 +21910,6 @@ exports.default = void 0;
 
 var _preact = require("preact");
 
-var _propTypes = _interopRequireDefault(require("prop-types"));
-
 var _Template = _interopRequireDefault(require("../Template/Template"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
@@ -21834,7 +21960,7 @@ function RefinementListItem(_ref) {
 
 var _default = RefinementListItem;
 exports.default = _default;
-},{"preact":"node_modules/preact/dist/preact.module.js","prop-types":"node_modules/prop-types/index.js","../Template/Template":"node_modules/instantsearch.js/es/components/Template/Template.js"}],"node_modules/instantsearch.js/es/components/SearchBox/SearchBox.js":[function(require,module,exports) {
+},{"preact":"node_modules/preact/dist/preact.module.js","../Template/Template":"node_modules/instantsearch.js/es/components/Template/Template.js"}],"node_modules/instantsearch.js/es/components/SearchBox/SearchBox.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -21843,8 +21969,6 @@ Object.defineProperty(exports, "__esModule", {
 exports.default = void 0;
 
 var _preact = require("preact");
-
-var _propTypes = _interopRequireDefault(require("prop-types"));
 
 var _utils = require("../../lib/utils");
 
@@ -21971,7 +22095,8 @@ function (_Component) {
     _this = _possibleConstructorReturn(this, (_getPrototypeOf2 = _getPrototypeOf(SearchBox)).call.apply(_getPrototypeOf2, [this].concat(args)));
 
     _defineProperty(_assertThisInitialized(_this), "state", {
-      query: _this.props.searchAsYouType ? '' : _this.props.query
+      query: _this.props.query,
+      focused: false
     });
 
     _defineProperty(_assertThisInitialized(_this), "onInput", function (event) {
@@ -21983,11 +22108,11 @@ function (_Component) {
 
       if (searchAsYouType) {
         refine(query);
-      } else {
-        _this.setState({
-          query: query
-        });
       }
+
+      _this.setState({
+        query: query
+      });
 
       onChange(event);
     });
@@ -22012,7 +22137,6 @@ function (_Component) {
 
     _defineProperty(_assertThisInitialized(_this), "onReset", function (event) {
       var _this$props3 = _this.props,
-          searchAsYouType = _this$props3.searchAsYouType,
           refine = _this$props3.refine,
           onReset = _this$props3.onReset;
       var query = '';
@@ -22021,13 +22145,23 @@ function (_Component) {
 
       refine(query);
 
-      if (!searchAsYouType) {
-        _this.setState({
-          query: query
-        });
-      }
+      _this.setState({
+        query: query
+      });
 
       onReset(event);
+    });
+
+    _defineProperty(_assertThisInitialized(_this), "onBlur", function () {
+      _this.setState({
+        focused: false
+      });
+    });
+
+    _defineProperty(_assertThisInitialized(_this), "onFocus", function () {
+      _this.setState({
+        focused: true
+      });
     });
 
     return _this;
@@ -22049,6 +22183,20 @@ function (_Component) {
       });
     }
   }, {
+    key: "componentWillReceiveProps",
+    value: function componentWillReceiveProps(nextProps) {
+      /**
+       * when the user is typing, we don't want to replace the query typed
+       * by the user (state.query) with the query exposed by the connector (props.query)
+       * see: https://github.com/algolia/instantsearch.js/issues/4141
+       */
+      if (!this.state.focused && nextProps.query !== this.state.query) {
+        this.setState({
+          query: nextProps.query
+        });
+      }
+    }
+  }, {
     key: "render",
     value: function render() {
       var _this2 = this;
@@ -22061,9 +22209,7 @@ function (_Component) {
           showReset = _this$props4.showReset,
           showLoadingIndicator = _this$props4.showLoadingIndicator,
           templates = _this$props4.templates,
-          isSearchStalled = _this$props4.isSearchStalled,
-          searchAsYouType = _this$props4.searchAsYouType;
-      var query = searchAsYouType ? this.props.query : this.state.query;
+          isSearchStalled = _this$props4.isSearchStalled;
       return (0, _preact.h)("div", {
         className: cssClasses.root
       }, (0, _preact.h)("form", {
@@ -22077,7 +22223,7 @@ function (_Component) {
         ref: function ref(inputRef) {
           return _this2.input = inputRef;
         },
-        value: query,
+        value: this.state.query,
         disabled: this.props.disabled,
         className: cssClasses.input,
         type: "search",
@@ -22086,9 +22232,11 @@ function (_Component) {
         autoComplete: "off",
         autoCorrect: "off",
         autoCapitalize: "off",
-        spellCheck: false,
+        spellCheck: "false",
         maxLength: 512,
-        onInput: this.onInput
+        onInput: this.onInput,
+        onBlur: this.onBlur,
+        onFocus: this.onFocus
       }), (0, _preact.h)(_Template.default, {
         templateKey: "submit",
         rootTagName: "button",
@@ -22109,7 +22257,7 @@ function (_Component) {
           className: cssClasses.reset,
           type: 'reset',
           title: 'Clear the search query.',
-          hidden: !(showReset && query.trim() && !isSearchStalled)
+          hidden: !(showReset && this.state.query.trim() && !isSearchStalled)
         },
         templates: templates,
         data: {
@@ -22150,7 +22298,7 @@ _defineProperty(SearchBox, "defaultProps", {
 
 var _default = SearchBox;
 exports.default = _default;
-},{"preact":"node_modules/preact/dist/preact.module.js","prop-types":"node_modules/prop-types/index.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js","../Template/Template":"node_modules/instantsearch.js/es/components/Template/Template.js"}],"node_modules/instantsearch.js/es/components/RefinementList/RefinementList.js":[function(require,module,exports) {
+},{"preact":"node_modules/preact/dist/preact.module.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js","../Template/Template":"node_modules/instantsearch.js/es/components/Template/Template.js"}],"node_modules/instantsearch.js/es/components/RefinementList/RefinementList.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -22159,8 +22307,6 @@ Object.defineProperty(exports, "__esModule", {
 exports.default = void 0;
 
 var _preact = require("preact");
-
-var _propTypes = _interopRequireDefault(require("prop-types"));
 
 var _classnames = _interopRequireDefault(require("classnames"));
 
@@ -22207,13 +22353,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -22416,7 +22562,8 @@ function (_Component) {
       var templateData = _objectSpread({}, facetValue, {
         url: url,
         attribute: this.props.attribute,
-        cssClasses: this.props.cssClasses
+        cssClasses: this.props.cssClasses,
+        isFromSearch: this.props.isFromSearch
       });
 
       var key = facetValue.value;
@@ -22581,7 +22728,7 @@ RefinementList.defaultProps = {
 };
 var _default = RefinementList;
 exports.default = _default;
-},{"preact":"node_modules/preact/dist/preact.module.js","prop-types":"node_modules/prop-types/index.js","classnames":"node_modules/classnames/index.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js","../Template/Template":"node_modules/instantsearch.js/es/components/Template/Template.js","./RefinementListItem":"node_modules/instantsearch.js/es/components/RefinementList/RefinementListItem.js","../SearchBox/SearchBox":"node_modules/instantsearch.js/es/components/SearchBox/SearchBox.js"}],"node_modules/instantsearch.js/es/connectors/hierarchical-menu/connectHierarchicalMenu.js":[function(require,module,exports) {
+},{"preact":"node_modules/preact/dist/preact.module.js","classnames":"node_modules/classnames/index.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js","../Template/Template":"node_modules/instantsearch.js/es/components/Template/Template.js","./RefinementListItem":"node_modules/instantsearch.js/es/components/RefinementList/RefinementListItem.js","../SearchBox/SearchBox":"node_modules/instantsearch.js/es/components/SearchBox/SearchBox.js"}],"node_modules/instantsearch.js/es/connectors/hierarchical-menu/connectHierarchicalMenu.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -22590,55 +22737,6 @@ Object.defineProperty(exports, "__esModule", {
 exports.default = connectHierarchicalMenu;
 
 var _utils = require("../../lib/utils");
-
-function ownKeys(object, enumerableOnly) {
-  var keys = Object.keys(object);
-
-  if (Object.getOwnPropertySymbols) {
-    var symbols = Object.getOwnPropertySymbols(object);
-    if (enumerableOnly) symbols = symbols.filter(function (sym) {
-      return Object.getOwnPropertyDescriptor(object, sym).enumerable;
-    });
-    keys.push.apply(keys, symbols);
-  }
-
-  return keys;
-}
-
-function _objectSpread(target) {
-  for (var i = 1; i < arguments.length; i++) {
-    var source = arguments[i] != null ? arguments[i] : {};
-
-    if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
-        _defineProperty(target, key, source[key]);
-      });
-    } else if (Object.getOwnPropertyDescriptors) {
-      Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
-    } else {
-      ownKeys(source).forEach(function (key) {
-        Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
-      });
-    }
-  }
-
-  return target;
-}
-
-function _defineProperty(obj, key, value) {
-  if (key in obj) {
-    Object.defineProperty(obj, key, {
-      value: value,
-      enumerable: true,
-      configurable: true,
-      writable: true
-    });
-  } else {
-    obj[key] = value;
-  }
-
-  return obj;
-}
 
 function _objectWithoutProperties(source, excluded) {
   if (source == null) return {};
@@ -22674,6 +22772,55 @@ function _objectWithoutPropertiesLoose(source, excluded) {
   }
 
   return target;
+}
+
+function ownKeys(object, enumerableOnly) {
+  var keys = Object.keys(object);
+
+  if (Object.getOwnPropertySymbols) {
+    var symbols = Object.getOwnPropertySymbols(object);
+    if (enumerableOnly) symbols = symbols.filter(function (sym) {
+      return Object.getOwnPropertyDescriptor(object, sym).enumerable;
+    });
+    keys.push.apply(keys, symbols);
+  }
+
+  return keys;
+}
+
+function _objectSpread(target) {
+  for (var i = 1; i < arguments.length; i++) {
+    var source = arguments[i] != null ? arguments[i] : {};
+
+    if (i % 2) {
+      ownKeys(Object(source), true).forEach(function (key) {
+        _defineProperty(target, key, source[key]);
+      });
+    } else if (Object.getOwnPropertyDescriptors) {
+      Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
+    } else {
+      ownKeys(Object(source)).forEach(function (key) {
+        Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
+      });
+    }
+  }
+
+  return target;
+}
+
+function _defineProperty(obj, key, value) {
+  if (key in obj) {
+    Object.defineProperty(obj, key, {
+      value: value,
+      enumerable: true,
+      configurable: true,
+      writable: true
+    });
+  } else {
+    obj[key] = value;
+  }
+
+  return obj;
 }
 
 function _slicedToArray(arr, i) {
@@ -22763,10 +22910,8 @@ var withUsage = (0, _utils.createDocumentationMessageGenerator)({
  * websites. From a UX point of view, we suggest not displaying more than two
  * levels deep.
  *
- * There's a complete example available on how to write a custom **HierarchicalMenu**:
- *  [hierarchicalMenu.js](https://github.com/algolia/instantsearch.js/blob/develop/storybook/app/jquery/widgets/hierarchicalMenu.js)
  * @type {Connector}
- * @param {function(HierarchicalMenuRenderingOptions)} renderFn Rendering function for the custom **HierarchicalMenu** widget.
+ * @param {function(HierarchicalMenuRenderingOptions, boolean)} renderFn Rendering function for the custom **HierarchicalMenu** widget.
  * @param {function} unmountFn Unmount function called when the widget is disposed.
  * @return {function(CustomHierarchicalMenuWidgetOptions)} Re-usable widget factory for a custom **HierarchicalMenu** widget.
  */
@@ -22810,15 +22955,18 @@ function connectHierarchicalMenu(renderFn) {
     var _attributes = _slicedToArray(attributes, 1),
         hierarchicalFacetName = _attributes[0];
 
+    var sendEvent; // Provide the same function to the `renderFn` so that way the user
+    // has to only bind it once when `isFirstRendering` for instance
+
+    var toggleShowMore = function toggleShowMore() {};
+
+    function cachedToggleShowMore() {
+      toggleShowMore();
+    }
+
     return {
       $$type: 'ais.hierarchicalMenu',
       isShowingMore: false,
-      // Provide the same function to the `renderFn` so that way the user
-      // has to only bind it once when `isFirstRendering` for instance
-      toggleShowMore: function toggleShowMore() {},
-      cachedToggleShowMore: function cachedToggleShowMore() {
-        this.toggleShowMore();
-      },
       createToggleShowMore: function createToggleShowMore(renderOptions) {
         var _this = this;
 
@@ -22831,42 +22979,22 @@ function connectHierarchicalMenu(renderFn) {
       getLimit: function getLimit() {
         return this.isShowingMore ? showMoreLimit : limit;
       },
-      init: function init(_ref) {
-        var helper = _ref.helper,
-            createURL = _ref.createURL,
-            instantSearchInstance = _ref.instantSearchInstance;
-        this.cachedToggleShowMore = this.cachedToggleShowMore.bind(this);
-
-        this._refine = function (facetValue) {
-          helper.toggleRefinement(hierarchicalFacetName, facetValue).search();
-        }; // Bind createURL to this specific attribute
-
-
-        function _createURL(facetValue) {
-          return createURL(helper.state.toggleRefinement(hierarchicalFacetName, facetValue));
-        }
-
-        renderFn({
-          items: [],
-          createURL: _createURL,
-          refine: this._refine,
-          instantSearchInstance: instantSearchInstance,
-          widgetParams: widgetParams,
-          isShowingMore: false,
-          toggleShowMore: this.cachedToggleShowMore,
-          canToggleShowMore: false
-        }, true);
+      init: function init(initOptions) {
+        var instantSearchInstance = initOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(initOptions), {
+          instantSearchInstance: instantSearchInstance
+        }), true);
       },
-      _prepareFacetValues: function _prepareFacetValues(facetValues, state) {
+      _prepareFacetValues: function _prepareFacetValues(facetValues) {
         var _this2 = this;
 
-        return facetValues.slice(0, this.getLimit()).map(function (_ref2) {
-          var label = _ref2.name,
-              value = _ref2.path,
-              subValue = _objectWithoutProperties(_ref2, ["name", "path"]);
+        return facetValues.slice(0, this.getLimit()).map(function (_ref) {
+          var label = _ref.name,
+              value = _ref.path,
+              subValue = _objectWithoutProperties(_ref, ["name", "path"]);
 
           if (Array.isArray(subValue.data)) {
-            subValue.data = _this2._prepareFacetValues(subValue.data, state);
+            subValue.data = _this2._prepareFacetValues(subValue.data);
           }
 
           return _objectSpread({}, subValue, {
@@ -22876,52 +23004,90 @@ function connectHierarchicalMenu(renderFn) {
         });
       },
       render: function render(renderOptions) {
-        var results = renderOptions.results,
-            state = renderOptions.state,
-            createURL = renderOptions.createURL,
-            instantSearchInstance = renderOptions.instantSearchInstance;
-        var facetValues = results.getFacetValues(hierarchicalFacetName, {
-          sortBy: sortBy
-        }).data || [];
-        var items = transformItems(this._prepareFacetValues(facetValues), state); // Bind createURL to this specific attribute
+        var instantSearchInstance = renderOptions.instantSearchInstance;
+        toggleShowMore = this.createToggleShowMore(renderOptions);
+        renderFn(_objectSpread({}, this.getWidgetRenderState(renderOptions), {
+          instantSearchInstance: instantSearchInstance
+        }), false);
+      },
+
+      /**
+       * @param {Object} param0 cleanup arguments
+       * @param {any} param0.state current search parameters
+       * @returns {any} next search parameters
+       */
+      dispose: function dispose(_ref2) {
+        var state = _ref2.state;
+        unmountFn();
+        return state.removeHierarchicalFacet(hierarchicalFacetName).setQueryParameter('maxValuesPerFacet', undefined);
+      },
+      getRenderState: function getRenderState(renderState, renderOptions) {
+        return _objectSpread({}, renderState, {
+          hierarchicalMenu: _objectSpread({}, renderState.hierarchicalMenu, _defineProperty({}, hierarchicalFacetName, this.getWidgetRenderState(renderOptions)))
+        });
+      },
+      getWidgetRenderState: function getWidgetRenderState(_ref3) {
+        var _this3 = this;
+
+        var results = _ref3.results,
+            state = _ref3.state,
+            createURL = _ref3.createURL,
+            instantSearchInstance = _ref3.instantSearchInstance,
+            helper = _ref3.helper; // Bind createURL to this specific attribute
 
         function _createURL(facetValue) {
           return createURL(state.toggleRefinement(hierarchicalFacetName, facetValue));
         }
 
-        var maxValuesPerFacetConfig = state.maxValuesPerFacet;
-        var currentLimit = this.getLimit(); // If the limit is the max number of facet retrieved it is impossible to know
-        // if the facets are exhaustive. The only moment we are sure it is exhaustive
-        // is when it is strictly under the number requested unless we know that another
-        // widget has requested more values (maxValuesPerFacet > getLimit()).
-        // Because this is used for making the search of facets unable or not, it is important
-        // to be conservative here.
+        if (!sendEvent) {
+          sendEvent = (0, _utils.createSendEventForFacet)({
+            instantSearchInstance: instantSearchInstance,
+            helper: helper,
+            attribute: hierarchicalFacetName,
+            widgetType: this.$$type
+          });
+        }
 
-        var hasExhaustiveItems = maxValuesPerFacetConfig > currentLimit ? facetValues.length <= currentLimit : facetValues.length < currentLimit;
-        this.toggleShowMore = this.createToggleShowMore(renderOptions);
-        renderFn({
+        if (!this._refine) {
+          this._refine = function (facetValue) {
+            sendEvent('click', facetValue);
+            helper.toggleRefinement(hierarchicalFacetName, facetValue).search();
+          };
+        }
+
+        var facetValues = results ? results.getFacetValues(hierarchicalFacetName, {
+          sortBy: sortBy
+        }).data || [] : [];
+        var items = transformItems(results ? this._prepareFacetValues(facetValues) : []);
+
+        var getHasExhaustiveItems = function getHasExhaustiveItems() {
+          if (!results) {
+            return false;
+          }
+
+          var currentLimit = _this3.getLimit(); // If the limit is the max number of facet retrieved it is impossible to know
+          // if the facets are exhaustive. The only moment we are sure it is exhaustive
+          // is when it is strictly under the number requested unless we know that another
+          // widget has requested more values (maxValuesPerFacet > getLimit()).
+          // Because this is used for making the search of facets unable or not, it is important
+          // to be conservative here.
+
+
+          return state.maxValuesPerFacet > currentLimit ? facetValues.length <= currentLimit : facetValues.length < currentLimit;
+        };
+
+        return {
           items: items,
           refine: this._refine,
           createURL: _createURL,
-          instantSearchInstance: instantSearchInstance,
+          sendEvent: sendEvent,
           widgetParams: widgetParams,
           isShowingMore: this.isShowingMore,
-          toggleShowMore: this.cachedToggleShowMore,
-          canToggleShowMore: showMore && (this.isShowingMore || !hasExhaustiveItems)
-        }, false);
+          toggleShowMore: cachedToggleShowMore,
+          canToggleShowMore: showMore && (this.isShowingMore || !getHasExhaustiveItems())
+        };
       },
-      // eslint-disable-next-line valid-jsdoc
-
-      /**
-       * @param {Object} param0
-       * @param {import('algoliasearch-helper').SearchParameters} param0.state
-       */
-      dispose: function dispose(_ref3) {
-        var state = _ref3.state;
-        unmountFn();
-        return state.removeHierarchicalFacet(hierarchicalFacetName).setQueryParameter('maxValuesPerFacet', undefined);
-      },
-      getWidgetState: function getWidgetState(uiState, _ref4) {
+      getWidgetUiState: function getWidgetUiState(uiState, _ref4) {
         var searchParameters = _ref4.searchParameters;
         var path = searchParameters.getHierarchicalFacetBreadcrumb(hierarchicalFacetName);
 
@@ -23248,7 +23414,7 @@ function hierarchicalMenu() {
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.default = connectHits;
+exports.default = void 0;
 
 var _escapeHighlight = _interopRequireWildcard(require("../../lib/escape-highlight"));
 
@@ -23277,13 +23443,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -23311,71 +23477,69 @@ var withUsage = (0, _utils.createDocumentationMessageGenerator)({
   name: 'hits',
   connector: true
 });
-/**
- * @typedef {Object} HitsRenderingOptions
- * @property {Object[]} hits The matched hits from Algolia API.
- * @property {Object} results The complete results response from Algolia API.
- * @property {Object} widgetParams All original widget options forwarded to the `renderFn`.
- */
 
-/**
- * @typedef {Object} CustomHitsWidgetOptions
- * @property {boolean} [escapeHTML = true] Whether to escape HTML tags from `hits[i]._highlightResult`.
- * @property {function(Object[]):Object[]} [transformItems] Function to transform the items passed to the templates.
- */
-
-/**
- * **Hits** connector provides the logic to create custom widgets that will render the results retrieved from Algolia.
- * @type {Connector}
- * @param {function(HitsRenderingOptions, boolean)} renderFn Rendering function for the custom **Hits** widget.
- * @param {function} unmountFn Unmount function called when the widget is disposed.
- * @return {function(CustomHitsWidgetOptions)} Re-usable widget factory for a custom **Hits** widget.
- * @example
- * // custom `renderFn` to render the custom Hits widget
- * function renderFn(HitsRenderingOptions) {
- *   HitsRenderingOptions.widgetParams.containerNode.html(
- *     HitsRenderingOptions.hits.map(function(hit) {
- *       return '<div>' + hit._highlightResult.name.value + '</div>';
- *     })
- *   );
- * }
- *
- * // connect `renderFn` to Hits logic
- * var customHits = instantsearch.connectors.connectHits(renderFn);
- *
- * // mount widget on the page
- * search.addWidgets([
- *   customHits({
- *     containerNode: $('#custom-hits-container'),
- *   })
- * ]);
- */
-
-function connectHits(renderFn) {
+var connectHits = function connectHits(renderFn) {
   var unmountFn = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : _utils.noop;
   (0, _utils.checkRendering)(renderFn, withUsage());
-  return function () {
-    var widgetParams = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-    var _widgetParams$escapeH = widgetParams.escapeHTML,
-        escapeHTML = _widgetParams$escapeH === void 0 ? true : _widgetParams$escapeH,
-        _widgetParams$transfo = widgetParams.transformItems,
-        transformItems = _widgetParams$transfo === void 0 ? function (items) {
+  return function (widgetParams) {
+    var _ref = widgetParams || {},
+        _ref$escapeHTML = _ref.escapeHTML,
+        escapeHTML = _ref$escapeHTML === void 0 ? true : _ref$escapeHTML,
+        _ref$transformItems = _ref.transformItems,
+        transformItems = _ref$transformItems === void 0 ? function (items) {
       return items;
-    } : _widgetParams$transfo;
+    } : _ref$transformItems;
+
+    var sendEvent;
+    var bindEvent;
     return {
       $$type: 'ais.hits',
-      init: function init(_ref) {
-        var instantSearchInstance = _ref.instantSearchInstance;
-        renderFn({
-          hits: [],
-          results: undefined,
-          instantSearchInstance: instantSearchInstance,
-          widgetParams: widgetParams
-        }, true);
+      init: function init(initOptions) {
+        renderFn(_objectSpread({}, this.getWidgetRenderState(initOptions), {
+          instantSearchInstance: initOptions.instantSearchInstance
+        }), true);
       },
-      render: function render(_ref2) {
+      render: function render(renderOptions) {
+        var renderState = this.getWidgetRenderState(renderOptions);
+        renderState.sendEvent('view', renderState.hits);
+        renderFn(_objectSpread({}, renderState, {
+          instantSearchInstance: renderOptions.instantSearchInstance
+        }), false);
+      },
+      getRenderState: function getRenderState(renderState, renderOptions) {
+        return _objectSpread({}, renderState, {
+          hits: this.getWidgetRenderState(renderOptions)
+        });
+      },
+      getWidgetRenderState: function getWidgetRenderState(_ref2) {
         var results = _ref2.results,
+            helper = _ref2.helper,
             instantSearchInstance = _ref2.instantSearchInstance;
+
+        if (!sendEvent) {
+          sendEvent = (0, _utils.createSendEventForHits)({
+            instantSearchInstance: instantSearchInstance,
+            index: helper.getIndex(),
+            widgetType: this.$$type
+          });
+        }
+
+        if (!bindEvent) {
+          bindEvent = (0, _utils.createBindEventForHits)({
+            index: helper.getIndex(),
+            widgetType: this.$$type
+          });
+        }
+
+        if (!results) {
+          return {
+            hits: [],
+            results: undefined,
+            sendEvent: sendEvent,
+            bindEvent: bindEvent,
+            widgetParams: widgetParams
+          };
+        }
 
         if (escapeHTML && results.hits.length > 0) {
           results.hits = (0, _escapeHighlight.default)(results.hits);
@@ -23389,12 +23553,13 @@ function connectHits(renderFn) {
         // hits widgets mounted on the page.
 
         results.hits.__escaped = initialEscaped;
-        renderFn({
+        return {
           hits: results.hits,
           results: results,
-          instantSearchInstance: instantSearchInstance,
+          sendEvent: sendEvent,
+          bindEvent: bindEvent,
           widgetParams: widgetParams
-        }, false);
+        };
       },
       dispose: function dispose(_ref3) {
         var state = _ref3.state;
@@ -23417,7 +23582,10 @@ function connectHits(renderFn) {
       }
     };
   };
-}
+};
+
+var _default = connectHits;
+exports.default = _default;
 },{"../../lib/escape-highlight":"node_modules/instantsearch.js/es/lib/escape-highlight.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js"}],"node_modules/instantsearch.js/es/components/Hits/Hits.js":[function(require,module,exports) {
 "use strict";
 
@@ -23427,8 +23595,6 @@ Object.defineProperty(exports, "__esModule", {
 exports.default = void 0;
 
 var _preact = require("preact");
-
-var _propTypes = _interopRequireDefault(require("prop-types"));
 
 var _classnames = _interopRequireDefault(require("classnames"));
 
@@ -23455,13 +23621,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -23508,6 +23674,7 @@ function _extends() {
 var Hits = function Hits(_ref) {
   var results = _ref.results,
       hits = _ref.hits,
+      bindEvent = _ref.bindEvent,
       cssClasses = _ref.cssClasses,
       templateProps = _ref.templateProps;
 
@@ -23535,7 +23702,8 @@ var Hits = function Hits(_ref) {
       key: hit.objectID,
       data: _objectSpread({}, hit, {
         __hitIndex: position
-      })
+      }),
+      bindEvent: bindEvent
     }));
   })));
 };
@@ -23548,7 +23716,7 @@ Hits.defaultProps = {
 };
 var _default = Hits;
 exports.default = _default;
-},{"preact":"node_modules/preact/dist/preact.module.js","prop-types":"node_modules/prop-types/index.js","classnames":"node_modules/classnames/index.js","../Template/Template":"node_modules/instantsearch.js/es/components/Template/Template.js"}],"node_modules/instantsearch.js/es/widgets/hits/defaultTemplates.js":[function(require,module,exports) {
+},{"preact":"node_modules/preact/dist/preact.module.js","classnames":"node_modules/classnames/index.js","../Template/Template":"node_modules/instantsearch.js/es/components/Template/Template.js"}],"node_modules/instantsearch.js/es/widgets/hits/defaultTemplates.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -23592,13 +23760,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -23648,7 +23816,7 @@ var getQueryID = function getQueryID(selectedHits) {
   var queryID = queryIDs[0];
 
   if (typeof queryID !== 'string') {
-    throw new Error('Could not infer `queryID`. Ensure InstantSearch is configured with `clickAnalytics: true`');
+    throw new Error("Could not infer `queryID`. Ensure InstantSearch `clickAnalytics: true` was added with the Configure widget.\n\nSee: https://alg.li/lNiZZ7");
   }
 
   return queryID;
@@ -23697,6 +23865,15 @@ exports.inferPayload = inferPayload;
 
 var wrapInsightsClient = function wrapInsightsClient(aa, results, hits) {
   return function (method, payload) {
+    "development" === 'development' ? (0, _utils.warning)(false, "`insights` function has been deprecated. It is still supported in 4.x releases, but not further. It is replaced by the `insights` middleware.\n\nFor more information, visit https://www.algolia.com/doc/guides/getting-insights-and-analytics/search-analytics/click-through-and-conversions/how-to/send-click-and-conversion-events-with-instantsearch/js/") : void 0;
+
+    if (!aa) {
+      var withInstantSearchUsage = (0, _utils.createDocumentationMessageGenerator)({
+        name: 'instantsearch'
+      });
+      throw new Error(withInstantSearchUsage('The `insightsClient` option has not been provided to `instantsearch`.'));
+    }
+
     if (!Array.isArray(payload.objectIDs)) {
       throw new TypeError('Expected `objectIDs` to be an array.');
     }
@@ -23710,6 +23887,11 @@ var wrapInsightsClient = function wrapInsightsClient(aa, results, hits) {
     aa(method, _objectSpread({}, inferredPayload, {}, payload));
   };
 };
+/**
+ * @deprecated This function will be still supported in 4.x releases, but not further. It is replaced by the `insights` middleware. For more information, visit https://www.algolia.com/doc/guides/getting-insights-and-analytics/search-analytics/click-through-and-conversions/how-to/send-click-and-conversion-events-with-instantsearch/js/
+ * It passes `insights` to `HitsWithInsightsListener` and `InfiniteHitsWithInsightsListener`.
+ */
+
 
 function withInsights(connector) {
   var wrapRenderFn = function wrapRenderFn(renderFn) {
@@ -23718,14 +23900,12 @@ function withInsights(connector) {
           hits = renderOptions.hits,
           instantSearchInstance = renderOptions.instantSearchInstance;
 
-      if (results && hits && instantSearchInstance && instantSearchInstance.insightsClient
-      /* providing the insightsClient is optional */
-      ) {
-          var insights = wrapInsightsClient(instantSearchInstance.insightsClient, results, hits);
-          return renderFn(_objectSpread({}, renderOptions, {
-            insights: insights
-          }), isFirstRender);
-        }
+      if (results && hits && instantSearchInstance) {
+        var insights = wrapInsightsClient(instantSearchInstance.insightsClient, results, hits);
+        return renderFn(_objectSpread({}, renderOptions, {
+          insights: insights
+        }), isFirstRender);
+      }
 
       return renderFn(renderOptions, isFirstRender);
     };
@@ -23748,22 +23928,61 @@ var _preact = require("preact");
 var _insights = require("../../helpers/insights");
 
 /** @jsx h */
+var findInsightsTarget = function findInsightsTarget(startElement, endElement, validator) {
+  var element = startElement;
+
+  while (element && !validator(element)) {
+    if (element === endElement) {
+      return null;
+    }
+
+    element = element.parentElement;
+  }
+
+  return element;
+};
+
+var parseInsightsEvent = function parseInsightsEvent(element) {
+  var serializedPayload = element.getAttribute('data-insights-event');
+
+  if (typeof serializedPayload !== 'string') {
+    throw new Error('The insights middleware expects `data-insights-event` to be a base64-encoded JSON string.');
+  }
+
+  try {
+    return JSON.parse(atob(serializedPayload));
+  } catch (error) {
+    throw new Error('The insights middleware was unable to parse `data-insights-event`.');
+  }
+};
+
 var insightsListener = function insightsListener(BaseComponent) {
   function WithInsightsListener(props) {
     var handleClick = function handleClick(event) {
-      if (!(0, _insights.hasDataAttributes)(event.target)) {
-        return;
+      if (props.sendEvent) {
+        // new way with insights middleware
+        var targetWithEvent = findInsightsTarget(event.target, event.currentTarget, function (element) {
+          return element.hasAttribute('data-insights-event');
+        });
+
+        if (targetWithEvent) {
+          var payload = parseInsightsEvent(targetWithEvent);
+          props.sendEvent(payload);
+        }
+      } // old way, e.g. instantsearch.insights("clickedObjectIDsAfterSearch", { .. })
+
+
+      var insightsTarget = findInsightsTarget(event.target, event.currentTarget, function (element) {
+        return (0, _insights.hasDataAttributes)(element);
+      });
+
+      if (insightsTarget) {
+        var _readDataAttributes = (0, _insights.readDataAttributes)(insightsTarget),
+            method = _readDataAttributes.method,
+            _payload = _readDataAttributes.payload;
+
+        props.insights(method, _payload);
       }
-
-      if (!props.insights) {
-        throw new Error('The `insightsClient` option has not been provided to `instantsearch`.');
-      }
-
-      var _readDataAttributes = (0, _insights.readDataAttributes)(event.target),
-          method = _readDataAttributes.method,
-          payload = _readDataAttributes.payload;
-
-      props.insights(method, payload);
     };
 
     return (0, _preact.h)("div", {
@@ -23816,7 +24035,7 @@ function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.default = hits;
+exports.default = void 0;
 
 var _preact = require("preact");
 
@@ -23852,7 +24071,8 @@ var renderer = function renderer(_ref) {
     var receivedHits = _ref2.hits,
         results = _ref2.results,
         instantSearchInstance = _ref2.instantSearchInstance,
-        insights = _ref2.insights;
+        insights = _ref2.insights,
+        bindEvent = _ref2.bindEvent;
 
     if (isFirstRendering) {
       renderState.templateProps = (0, _utils.prepareTemplateProps)({
@@ -23868,60 +24088,18 @@ var renderer = function renderer(_ref) {
       hits: receivedHits,
       results: results,
       templateProps: renderState.templateProps,
-      insights: insights
+      insights: insights,
+      sendEvent: function sendEvent(event) {
+        instantSearchInstance.sendEventToInsights(event);
+      },
+      bindEvent: bindEvent
     }), containerNode);
   };
 };
-/**
- * @typedef {Object} HitsCSSClasses
- * @property {string|string[]} [root] CSS class to add to the wrapping element.
- * @property {string|string[]} [emptyRoot] CSS class to add to the wrapping element when no results.
- * @property {string|string[]} [list] CSS class to add to the list of results.
- * @property {string|string[]} [item] CSS class to add to each result.
- */
 
-/**
- * @typedef {Object} HitsTemplates
- * @property {string|function(object):string} [empty=''] Template to use when there are no results.
- * @property {string|function(object):string} [item=''] Template to use for each result. This template will receive an object containing a single record. The record will have a new property `__hitIndex` for the position of the record in the list of displayed hits.
- */
-
-/**
- * @typedef {Object} HitsWidgetOptions
- * @property {string|HTMLElement} container CSS Selector or HTMLElement to insert the widget.
- * @property {HitsTemplates} [templates] Templates to use for the widget.
- * @property {HitsCSSClasses} [cssClasses] CSS classes to add.
- * @property {boolean} [escapeHTML = true] Escape HTML entities from hits string values.
- * @property {function(object[]):object[]} [transformItems] Function to transform the items passed to the templates.
- */
-
-/**
- * Display the list of results (hits) from the current search.
- *
- * This is a traditional display of the hits. It has to be implemented
- * together with a pagination widget, to let the user browse the results
- * beyond the first page.
- * @type {WidgetFactory}
- * @devNovel Hits
- * @category basic
- * @param {HitsWidgetOptions} $0 Options of the Hits widget.
- * @return {Widget} A new instance of Hits widget.
- * @example
- * search.addWidgets([
- *   instantsearch.widgets.hits({
- *     container: '#hits-container',
- *     templates: {
- *       empty: 'No results',
- *       item: '<strong>Hit {{objectID}}</strong>: {{{_highlightResult.name.value}}}'
- *     },
- *     transformItems: items => items.map(item => item),
- *   })
- * ]);
- */
-
-
-function hits(_ref3) {
-  var container = _ref3.container,
+var hits = function hits(widgetOptions) {
+  var _ref3 = widgetOptions || {},
+      container = _ref3.container,
       escapeHTML = _ref3.escapeHTML,
       transformItems = _ref3.transformItems,
       _ref3$templates = _ref3.templates,
@@ -23959,7 +24137,10 @@ function hits(_ref3) {
     escapeHTML: escapeHTML,
     transformItems: transformItems
   });
-}
+};
+
+var _default = hits;
+exports.default = _default;
 },{"preact":"node_modules/preact/dist/preact.module.js","classnames":"node_modules/classnames/index.js","../../connectors/hits/connectHits":"node_modules/instantsearch.js/es/connectors/hits/connectHits.js","../../components/Hits/Hits":"node_modules/instantsearch.js/es/components/Hits/Hits.js","./defaultTemplates":"node_modules/instantsearch.js/es/widgets/hits/defaultTemplates.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js","../../lib/suit":"node_modules/instantsearch.js/es/lib/suit.js","../../lib/insights":"node_modules/instantsearch.js/es/lib/insights/index.js"}],"node_modules/instantsearch.js/es/components/Selector/Selector.js":[function(require,module,exports) {
 "use strict";
 
@@ -23969,8 +24150,6 @@ Object.defineProperty(exports, "__esModule", {
 exports.default = void 0;
 
 var _preact = require("preact");
-
-var _propTypes = _interopRequireDefault(require("prop-types"));
 
 var _classnames = _interopRequireDefault(require("classnames"));
 
@@ -23999,64 +24178,15 @@ function Selector(_ref) {
 
 var _default = Selector;
 exports.default = _default;
-},{"preact":"node_modules/preact/dist/preact.module.js","prop-types":"node_modules/prop-types/index.js","classnames":"node_modules/classnames/index.js"}],"node_modules/instantsearch.js/es/connectors/hits-per-page/connectHitsPerPage.js":[function(require,module,exports) {
+},{"preact":"node_modules/preact/dist/preact.module.js","classnames":"node_modules/classnames/index.js"}],"node_modules/instantsearch.js/es/connectors/hits-per-page/connectHitsPerPage.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.default = connectHitsPerPage;
+exports.default = void 0;
 
 var _utils = require("../../lib/utils");
-
-function ownKeys(object, enumerableOnly) {
-  var keys = Object.keys(object);
-
-  if (Object.getOwnPropertySymbols) {
-    var symbols = Object.getOwnPropertySymbols(object);
-    if (enumerableOnly) symbols = symbols.filter(function (sym) {
-      return Object.getOwnPropertyDescriptor(object, sym).enumerable;
-    });
-    keys.push.apply(keys, symbols);
-  }
-
-  return keys;
-}
-
-function _objectSpread(target) {
-  for (var i = 1; i < arguments.length; i++) {
-    var source = arguments[i] != null ? arguments[i] : {};
-
-    if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
-        _defineProperty(target, key, source[key]);
-      });
-    } else if (Object.getOwnPropertyDescriptors) {
-      Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
-    } else {
-      ownKeys(source).forEach(function (key) {
-        Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
-      });
-    }
-  }
-
-  return target;
-}
-
-function _defineProperty(obj, key, value) {
-  if (key in obj) {
-    Object.defineProperty(obj, key, {
-      value: value,
-      enumerable: true,
-      configurable: true,
-      writable: true
-    });
-  } else {
-    obj[key] = value;
-  }
-
-  return obj;
-}
 
 function _toConsumableArray(arr) {
   return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _nonIterableSpread();
@@ -24080,105 +24210,71 @@ function _arrayWithoutHoles(arr) {
   }
 }
 
+function ownKeys(object, enumerableOnly) {
+  var keys = Object.keys(object);
+
+  if (Object.getOwnPropertySymbols) {
+    var symbols = Object.getOwnPropertySymbols(object);
+    if (enumerableOnly) symbols = symbols.filter(function (sym) {
+      return Object.getOwnPropertyDescriptor(object, sym).enumerable;
+    });
+    keys.push.apply(keys, symbols);
+  }
+
+  return keys;
+}
+
+function _objectSpread(target) {
+  for (var i = 1; i < arguments.length; i++) {
+    var source = arguments[i] != null ? arguments[i] : {};
+
+    if (i % 2) {
+      ownKeys(Object(source), true).forEach(function (key) {
+        _defineProperty(target, key, source[key]);
+      });
+    } else if (Object.getOwnPropertyDescriptors) {
+      Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
+    } else {
+      ownKeys(Object(source)).forEach(function (key) {
+        Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
+      });
+    }
+  }
+
+  return target;
+}
+
+function _defineProperty(obj, key, value) {
+  if (key in obj) {
+    Object.defineProperty(obj, key, {
+      value: value,
+      enumerable: true,
+      configurable: true,
+      writable: true
+    });
+  } else {
+    obj[key] = value;
+  }
+
+  return obj;
+}
+
 var withUsage = (0, _utils.createDocumentationMessageGenerator)({
   name: 'hits-per-page',
   connector: true
 });
-/**
- * @typedef {Object} HitsPerPageRenderingOptionsItem
- * @property {number} value Number of hits to display per page.
- * @property {string} label Label to display in the option.
- * @property {boolean} isRefined Indicates if it's the current refined value.
- */
 
-/**
- * @typedef {Object} HitsPerPageWidgetOptionsItem
- * @property {number} value Number of hits to display per page.
- * @property {string} label Label to display in the option.
- * @property {boolean} default The default hits per page on first search.
- */
-
-/**
- * @typedef {Object} HitsPerPageRenderingOptions
- * @property {HitsPerPageRenderingOptionsItem[]} items Array of objects defining the different values and labels.
- * @property {function(item.value)} createURL Creates the URL for a single item name in the list.
- * @property {function(number)} refine Sets the number of hits per page and trigger a search.
- * @property {boolean} hasNoResults `true` if the last search contains no result.
- * @property {Object} widgetParams Original `HitsPerPageWidgetOptions` forwarded to `renderFn`.
- */
-
-/**
- * @typedef {Object} HitsPerPageWidgetOptions
- * @property {HitsPerPageWidgetOptionsItem[]} items Array of objects defining the different values and labels.
- * @property {function(object[]):object[]} [transformItems] Function to transform the items passed to the templates.
- */
-
-/**
- * **HitsPerPage** connector provides the logic to create custom widget that will
- * allow a user to choose to display more or less results from Algolia.
- *
- * This connector provides a `refine()` function to change the hits per page configuration and trigger a new search.
- * @type {Connector}
- * @param {function(HitsPerPageRenderingOptions, boolean)} renderFn Rendering function for the custom **HitsPerPage** widget.
- * @param {function} unmountFn Unmount function called when the widget is disposed.
- * @return {function(HitsPerPageWidgetOptions)} Re-usable widget factory for a custom **HitsPerPage** widget.
- * @example
- * // custom `renderFn` to render the custom HitsPerPage widget
- * function renderFn(HitsPerPageRenderingOptions, isFirstRendering) {
- *   var containerNode = HitsPerPageRenderingOptions.widgetParams.containerNode
- *   var items = HitsPerPageRenderingOptions.items
- *   var refine = HitsPerPageRenderingOptions.refine
- *
- *   if (isFirstRendering) {
- *     var markup = '<select></select>';
- *     containerNode.append(markup);
- *   }
- *
- *   const itemsHTML = items.map(({value, label, isRefined}) => `
- *     <option
- *       value="${value}"
- *       ${isRefined ? 'selected' : ''}
- *     >
- *       ${label}
- *     </option>
- *   `);
- *
- *   containerNode
- *     .find('select')
- *     .html(itemsHTML);
- *
- *   containerNode
- *     .find('select')
- *     .off('change')
- *     .on('change', e => { refine(e.target.value); });
- * }
- *
- * // connect `renderFn` to HitsPerPage logic
- * var customHitsPerPage = instantsearch.connectors.connectHitsPerPage(renderFn);
- *
- * // mount widget on the page
- * search.addWidgets([
- *   customHitsPerPage({
- *     containerNode: $('#custom-hits-per-page-container'),
- *     items: [
- *       {value: 6, label: '6 per page', default: true},
- *       {value: 12, label: '12 per page'},
- *       {value: 24, label: '24 per page'},
- *     ],
- *   })
- * ]);
- */
-
-function connectHitsPerPage(renderFn) {
+var connectHitsPerPage = function connectHitsPerPage(renderFn) {
   var unmountFn = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : _utils.noop;
   (0, _utils.checkRendering)(renderFn, withUsage());
-  return function () {
-    var widgetParams = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-    var userItems = widgetParams.items,
-        _widgetParams$transfo = widgetParams.transformItems,
-        transformItems = _widgetParams$transfo === void 0 ? function (items) {
+  return function (widgetParams) {
+    var _ref = widgetParams || {},
+        userItems = _ref.items,
+        _ref$transformItems = _ref.transformItems,
+        transformItems = _ref$transformItems === void 0 ? function (items) {
       return items;
-    } : _widgetParams$transfo;
+    } : _ref$transformItems;
+
     var items = userItems;
 
     if (!Array.isArray(items)) {
@@ -24198,74 +24294,87 @@ function connectHitsPerPage(renderFn) {
     }
 
     var defaultItem = defaultItems[0];
+
+    var normalizeItems = function normalizeItems(_ref2) {
+      var hitsPerPage = _ref2.hitsPerPage;
+      return items.map(function (item) {
+        return _objectSpread({}, item, {
+          isRefined: Number(item.value) === Number(hitsPerPage)
+        });
+      });
+    };
+
+    var connectorState = {
+      getRefine: function getRefine(helper) {
+        return function (value) {
+          return !value && value !== 0 ? helper.setQueryParameter('hitsPerPage', undefined).search() : helper.setQueryParameter('hitsPerPage', value).search();
+        };
+      },
+      createURLFactory: function createURLFactory(_ref3) {
+        var state = _ref3.state,
+            createURL = _ref3.createURL;
+        return function (value) {
+          return createURL(state.setQueryParameter('hitsPerPage', !value && value !== 0 ? undefined : value));
+        };
+      }
+    };
     return {
       $$type: 'ais.hitsPerPage',
-      init: function init(_ref) {
-        var helper = _ref.helper,
-            createURL = _ref.createURL,
-            state = _ref.state,
-            instantSearchInstance = _ref.instantSearchInstance;
+      init: function init(initOptions) {
+        var state = initOptions.state,
+            instantSearchInstance = initOptions.instantSearchInstance;
         var isCurrentInOptions = items.some(function (item) {
           return Number(state.hitsPerPage) === Number(item.value);
         });
 
         if (!isCurrentInOptions) {
-          "development" === 'development' ? (0, _utils.warning)(state.hitsPerPage !== undefined, "\n`hitsPerPage` is not defined.\nThe option `hitsPerPage` needs to be set using the `configure` widget.\n\nLearn more: https://community.algolia.com/instantsearch.js/v2/widgets/configure.html\n            ") : void 0;
+          "development" === 'development' ? (0, _utils.warning)(state.hitsPerPage !== undefined, "\n`hitsPerPage` is not defined.\nThe option `hitsPerPage` needs to be set using the `configure` widget.\n\nLearn more: https://www.algolia.com/doc/api-reference/widgets/hits-per-page/js/\n            ") : void 0;
           "development" === 'development' ? (0, _utils.warning)(false, "\nThe `items` option of `hitsPerPage` does not contain the \"hits per page\" value coming from the state: ".concat(state.hitsPerPage, ".\n\nYou may want to add another entry to the `items` option with this value.")) : void 0;
-          items = [{
+          items = [// The helper will convert the empty string to `undefined`.
+          {
             value: '',
             label: ''
           }].concat(_toConsumableArray(items));
         }
 
-        this.setHitsPerPage = function (value) {
-          return !value && value !== 0 ? helper.setQueryParameter('hitsPerPage', undefined).search() : helper.setQueryParameter('hitsPerPage', value).search();
-        };
-
-        this.createURL = function (helperState) {
-          return function (value) {
-            return createURL(helperState.setQueryParameter('hitsPerPage', !value && value !== 0 ? undefined : value));
-          };
-        };
-
-        renderFn({
-          items: transformItems(this._normalizeItems(state)),
-          refine: this.setHitsPerPage,
-          createURL: this.createURL(helper.state),
-          hasNoResults: true,
-          widgetParams: widgetParams,
+        renderFn(_objectSpread({}, this.getWidgetRenderState(initOptions), {
           instantSearchInstance: instantSearchInstance
-        }, true);
+        }), true);
       },
-      render: function render(_ref2) {
-        var state = _ref2.state,
-            results = _ref2.results,
-            instantSearchInstance = _ref2.instantSearchInstance;
-        var hasNoResults = results.nbHits === 0;
-        renderFn({
-          items: transformItems(this._normalizeItems(state)),
-          refine: this.setHitsPerPage,
-          createURL: this.createURL(state),
-          hasNoResults: hasNoResults,
-          widgetParams: widgetParams,
+      render: function render(initOptions) {
+        var instantSearchInstance = initOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(initOptions), {
           instantSearchInstance: instantSearchInstance
-        }, false);
-      },
-      _normalizeItems: function _normalizeItems(_ref3) {
-        var hitsPerPage = _ref3.hitsPerPage;
-        return items.map(function (item) {
-          return _objectSpread({}, item, {
-            isRefined: Number(item.value) === Number(hitsPerPage)
-          });
-        });
+        }), false);
       },
       dispose: function dispose(_ref4) {
         var state = _ref4.state;
         unmountFn();
         return state.setQueryParameter('hitsPerPage', undefined);
       },
-      getWidgetState: function getWidgetState(uiState, _ref5) {
-        var searchParameters = _ref5.searchParameters;
+      getRenderState: function getRenderState(renderState, renderOptions) {
+        return _objectSpread({}, renderState, {
+          hitsPerPage: this.getWidgetRenderState(renderOptions)
+        });
+      },
+      getWidgetRenderState: function getWidgetRenderState(_ref5) {
+        var state = _ref5.state,
+            results = _ref5.results,
+            createURL = _ref5.createURL,
+            helper = _ref5.helper;
+        return {
+          items: transformItems(normalizeItems(state)),
+          refine: connectorState.getRefine(helper),
+          createURL: connectorState.createURLFactory({
+            state: state,
+            createURL: createURL
+          }),
+          hasNoResults: results ? results.nbHits === 0 : true,
+          widgetParams: widgetParams
+        };
+      },
+      getWidgetUiState: function getWidgetUiState(uiState, _ref6) {
+        var searchParameters = _ref6.searchParameters;
         var hitsPerPage = searchParameters.hitsPerPage;
 
         if (hitsPerPage === undefined || hitsPerPage === defaultItem.value) {
@@ -24276,22 +24385,25 @@ function connectHitsPerPage(renderFn) {
           hitsPerPage: hitsPerPage
         });
       },
-      getWidgetSearchParameters: function getWidgetSearchParameters(searchParameters, _ref6) {
-        var uiState = _ref6.uiState;
+      getWidgetSearchParameters: function getWidgetSearchParameters(searchParameters, _ref7) {
+        var uiState = _ref7.uiState;
         return searchParameters.setQueryParameters({
           hitsPerPage: uiState.hitsPerPage || defaultItem.value
         });
       }
     };
   };
-}
+};
+
+var _default = connectHitsPerPage;
+exports.default = _default;
 },{"../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js"}],"node_modules/instantsearch.js/es/widgets/hits-per-page/hits-per-page.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.default = hitsPerPage;
+exports.default = void 0;
 
 var _preact = require("preact");
 
@@ -24337,54 +24449,9 @@ var renderer = function renderer(_ref) {
     })), containerNode);
   };
 };
-/**
- * @typedef {Object} HitsPerPageCSSClasses
- * @property {string|string[]} [root] CSS classes added to the outer `<div>`.
- * @property {string|string[]} [select] CSS classes added to the parent `<select>`.
- * @property {string|string[]} [option] CSS classes added to each `<option>`.
- */
 
-/**
- * @typedef {Object} HitsPerPageItems
- * @property {number} value number of hits to display per page.
- * @property {string} label Label to display in the option.
- * @property {boolean} default The default hits per page on first search.
- */
-
-/**
- * @typedef {Object} HitsPerPageWidgetOptions
- * @property {string|HTMLElement} container CSS Selector or HTMLElement to insert the widget.
- * @property {HitsPerPageItems[]} items Array of objects defining the different values and labels.
- * @property {HitsPerPageCSSClasses} [cssClasses] CSS classes to be added.
- * @property {function(object[]):object[]} [transformItems] Function to transform the items passed to the templates.
- */
-
-/**
- * The hitsPerPage widget gives the user the ability to change the number of results
- * displayed in the hits widget.
- *
- * You can specify the default hits per page using a boolean in the items[] array. If none is specified, this first hits per page option will be picked.
- * @type {WidgetFactory}
- * @devNovel HitsPerPage
- * @category basic
- * @param {HitsPerPageWidgetOptions} $0 The options of the HitPerPageSelector widget.
- * @return {Widget} A new instance of the HitPerPageSelector widget.
- * @example
- * search.addWidgets([
- *   instantsearch.widgets.hitsPerPage({
- *     container: '#hits-per-page',
- *     items: [
- *       {value: 3, label: '3 per page', default: true},
- *       {value: 6, label: '6 per page'},
- *       {value: 12, label: '12 per page'},
- *     ]
- *   })
- * ]);
- */
-
-
-function hitsPerPage() {
-  var _ref5 = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {},
+var hitsPerPage = function hitsPerPage(widgetOptions) {
+  var _ref5 = widgetOptions || {},
       container = _ref5.container,
       items = _ref5.items,
       _ref5$cssClasses = _ref5.cssClasses,
@@ -24416,7 +24483,10 @@ function hitsPerPage() {
     items: items,
     transformItems: transformItems
   });
-}
+};
+
+var _default = hitsPerPage;
+exports.default = _default;
 },{"preact":"node_modules/preact/dist/preact.module.js","classnames":"node_modules/classnames/index.js","../../components/Selector/Selector":"node_modules/instantsearch.js/es/components/Selector/Selector.js","../../connectors/hits-per-page/connectHitsPerPage":"node_modules/instantsearch.js/es/connectors/hits-per-page/connectHitsPerPage.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js","../../lib/suit":"node_modules/instantsearch.js/es/lib/suit.js"}],"node_modules/instantsearch.js/es/components/InfiniteHits/InfiniteHits.js":[function(require,module,exports) {
 "use strict";
 
@@ -24452,13 +24522,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -24505,6 +24575,7 @@ function _extends() {
 var InfiniteHits = function InfiniteHits(_ref) {
   var results = _ref.results,
       hits = _ref.hits,
+      bindEvent = _ref.bindEvent,
       hasShowPrevious = _ref.hasShowPrevious,
       showPrevious = _ref.showPrevious,
       showMore = _ref.showMore,
@@ -24545,7 +24616,8 @@ var InfiniteHits = function InfiniteHits(_ref) {
       key: hit.objectID,
       data: _objectSpread({}, hit, {
         __hitIndex: position
-      })
+      }),
+      bindEvent: bindEvent
     }));
   })), (0, _preact.h)(_Template.default, _extends({}, templateProps, {
     templateKey: "showMoreText",
@@ -24575,6 +24647,55 @@ var _utils = require("../../lib/utils");
 function _getRequireWildcardCache() { if (typeof WeakMap !== "function") return null; var cache = new WeakMap(); _getRequireWildcardCache = function () { return cache; }; return cache; }
 
 function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } if (obj === null || typeof obj !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
+
+function ownKeys(object, enumerableOnly) {
+  var keys = Object.keys(object);
+
+  if (Object.getOwnPropertySymbols) {
+    var symbols = Object.getOwnPropertySymbols(object);
+    if (enumerableOnly) symbols = symbols.filter(function (sym) {
+      return Object.getOwnPropertyDescriptor(object, sym).enumerable;
+    });
+    keys.push.apply(keys, symbols);
+  }
+
+  return keys;
+}
+
+function _objectSpread(target) {
+  for (var i = 1; i < arguments.length; i++) {
+    var source = arguments[i] != null ? arguments[i] : {};
+
+    if (i % 2) {
+      ownKeys(Object(source), true).forEach(function (key) {
+        _defineProperty(target, key, source[key]);
+      });
+    } else if (Object.getOwnPropertyDescriptors) {
+      Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
+    } else {
+      ownKeys(Object(source)).forEach(function (key) {
+        Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
+      });
+    }
+  }
+
+  return target;
+}
+
+function _defineProperty(obj, key, value) {
+  if (key in obj) {
+    Object.defineProperty(obj, key, {
+      value: value,
+      enumerable: true,
+      configurable: true,
+      writable: true
+    });
+  } else {
+    obj[key] = value;
+  }
+
+  return obj;
+}
 
 function _toConsumableArray(arr) {
   return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _nonIterableSpread();
@@ -24634,193 +24755,193 @@ function _objectWithoutPropertiesLoose(source, excluded) {
   return target;
 }
 
-function ownKeys(object, enumerableOnly) {
-  var keys = Object.keys(object);
-
-  if (Object.getOwnPropertySymbols) {
-    var symbols = Object.getOwnPropertySymbols(object);
-    if (enumerableOnly) symbols = symbols.filter(function (sym) {
-      return Object.getOwnPropertyDescriptor(object, sym).enumerable;
-    });
-    keys.push.apply(keys, symbols);
-  }
-
-  return keys;
-}
-
-function _objectSpread(target) {
-  for (var i = 1; i < arguments.length; i++) {
-    var source = arguments[i] != null ? arguments[i] : {};
-
-    if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
-        _defineProperty(target, key, source[key]);
-      });
-    } else if (Object.getOwnPropertyDescriptors) {
-      Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
-    } else {
-      ownKeys(source).forEach(function (key) {
-        Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
-      });
-    }
-  }
-
-  return target;
-}
-
-function _defineProperty(obj, key, value) {
-  if (key in obj) {
-    Object.defineProperty(obj, key, {
-      value: value,
-      enumerable: true,
-      configurable: true,
-      writable: true
-    });
-  } else {
-    obj[key] = value;
-  }
-
-  return obj;
-}
-
 var withUsage = (0, _utils.createDocumentationMessageGenerator)({
   name: 'infinite-hits',
   connector: true
 });
 
+function getStateWithoutPage(state) {
+  var _ref = state || {},
+      page = _ref.page,
+      rest = _objectWithoutProperties(_ref, ["page"]);
+
+  return rest;
+}
+
+function getInMemoryCache() {
+  var cachedHits = null;
+  var cachedState = undefined;
+  return {
+    read: function read(_ref2) {
+      var state = _ref2.state;
+      return (0, _utils.isEqual)(cachedState, getStateWithoutPage(state)) ? cachedHits : null;
+    },
+    write: function write(_ref3) {
+      var state = _ref3.state,
+          hits = _ref3.hits;
+      cachedState = getStateWithoutPage(state);
+      cachedHits = hits;
+    }
+  };
+}
+
+function extractHitsFromCachedHits(cachedHits) {
+  return Object.keys(cachedHits).map(Number).sort(function (a, b) {
+    return a - b;
+  }).reduce(function (acc, page) {
+    return acc.concat(cachedHits[page]);
+  }, []);
+}
+
 var connectInfiniteHits = function connectInfiniteHits(renderFn) {
   var unmountFn = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : _utils.noop;
   (0, _utils.checkRendering)(renderFn, withUsage());
   return function (widgetParams) {
-    var _ref = widgetParams || {},
-        _ref$escapeHTML = _ref.escapeHTML,
-        escapeHTML = _ref$escapeHTML === void 0 ? true : _ref$escapeHTML,
-        _ref$transformItems = _ref.transformItems,
-        transformItems = _ref$transformItems === void 0 ? function (items) {
+    var _ref4 = widgetParams || {},
+        _ref4$escapeHTML = _ref4.escapeHTML,
+        escapeHTML = _ref4$escapeHTML === void 0 ? true : _ref4$escapeHTML,
+        _ref4$transformItems = _ref4.transformItems,
+        transformItems = _ref4$transformItems === void 0 ? function (items) {
       return items;
-    } : _ref$transformItems,
-        _ref$showPrevious = _ref.showPrevious,
-        hasShowPrevious = _ref$showPrevious === void 0 ? false : _ref$showPrevious;
+    } : _ref4$transformItems,
+        _ref4$cache = _ref4.cache,
+        cache = _ref4$cache === void 0 ? getInMemoryCache() : _ref4$cache;
 
-    var hitsCache = [];
-    var firstReceivedPage = Infinity;
-    var lastReceivedPage = -1;
-    var prevState;
     var showPrevious;
     var showMore;
+    var sendEvent;
+    var bindEvent;
 
-    var getShowPrevious = function getShowPrevious(helper) {
+    var getFirstReceivedPage = function getFirstReceivedPage(state, cachedHits) {
+      var _state$page = state.page,
+          page = _state$page === void 0 ? 0 : _state$page;
+      var pages = Object.keys(cachedHits).map(Number);
+
+      if (pages.length === 0) {
+        return page;
+      } else {
+        return Math.min.apply(Math, [page].concat(_toConsumableArray(pages)));
+      }
+    };
+
+    var getLastReceivedPage = function getLastReceivedPage(state, cachedHits) {
+      var _state$page2 = state.page,
+          page = _state$page2 === void 0 ? 0 : _state$page2;
+      var pages = Object.keys(cachedHits).map(Number);
+
+      if (pages.length === 0) {
+        return page;
+      } else {
+        return Math.max.apply(Math, [page].concat(_toConsumableArray(pages)));
+      }
+    };
+
+    var getShowPrevious = function getShowPrevious(helper, cachedHits) {
       return function () {
         // Using the helper's `overrideStateWithoutTriggeringChangeEvent` method
         // avoid updating the browser URL when the user displays the previous page.
         helper.overrideStateWithoutTriggeringChangeEvent(_objectSpread({}, helper.state, {
-          page: firstReceivedPage - 1
-        })).search();
+          page: getFirstReceivedPage(helper.state, cachedHits) - 1
+        })).searchWithoutTriggeringOnStateChange();
       };
     };
 
-    var getShowMore = function getShowMore(helper) {
+    var getShowMore = function getShowMore(helper, cachedHits) {
       return function () {
-        helper.setPage(lastReceivedPage + 1).search();
+        helper.setPage(getLastReceivedPage(helper.state, cachedHits) + 1).search();
       };
-    };
-
-    var filterEmptyRefinements = function filterEmptyRefinements() {
-      var refinements = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-      return Object.keys(refinements).filter(function (key) {
-        return Array.isArray(refinements[key]) ? refinements[key].length : Object.keys(refinements[key]).length;
-      }).reduce(function (obj, key) {
-        obj[key] = refinements[key];
-        return obj;
-      }, {});
     };
 
     return {
       $$type: 'ais.infiniteHits',
-      init: function init(_ref2) {
-        var instantSearchInstance = _ref2.instantSearchInstance,
-            helper = _ref2.helper;
-        showPrevious = getShowPrevious(helper);
-        showMore = getShowMore(helper);
-        firstReceivedPage = helper.state.page || 0;
-        lastReceivedPage = helper.state.page || 0;
-        renderFn({
-          hits: hitsCache,
-          results: undefined,
-          showPrevious: showPrevious,
-          showMore: showMore,
-          isFirstPage: firstReceivedPage === 0,
-          isLastPage: true,
-          instantSearchInstance: instantSearchInstance,
-          widgetParams: widgetParams
-        }, true);
+      init: function init(initOptions) {
+        renderFn(_objectSpread({}, this.getWidgetRenderState(initOptions), {
+          instantSearchInstance: initOptions.instantSearchInstance
+        }), true);
       },
-      render: function render(_ref3) {
-        var results = _ref3.results,
-            state = _ref3.state,
-            instantSearchInstance = _ref3.instantSearchInstance; // Reset cache and received pages if anything changes in the
-        // search state, except for the page.
-        //
-        // We're doing this to "reset" the widget if a refinement or the
-        // query changes between renders, but we want to keep it as is
-        // if we only change pages.
+      render: function render(renderOptions) {
+        var instantSearchInstance = renderOptions.instantSearchInstance;
+        var widgetRenderState = this.getWidgetRenderState(renderOptions);
+        sendEvent('view', widgetRenderState.currentPageHits);
+        renderFn(_objectSpread({}, widgetRenderState, {
+          instantSearchInstance: instantSearchInstance
+        }), false);
+      },
+      getRenderState: function getRenderState(renderState, renderOptions) {
+        return _objectSpread({}, renderState, {
+          infiniteHits: this.getWidgetRenderState(renderOptions)
+        });
+      },
+      getWidgetRenderState: function getWidgetRenderState(_ref5) {
+        var results = _ref5.results,
+            helper = _ref5.helper,
+            state = _ref5.state,
+            instantSearchInstance = _ref5.instantSearchInstance;
+        var isFirstPage;
+        var currentPageHits = [];
+        var cachedHits = cache.read({
+          state: state
+        }) || {};
 
-        var _state$page = state.page,
-            page = _state$page === void 0 ? 0 : _state$page,
-            facets = state.facets,
-            hierarchicalFacets = state.hierarchicalFacets,
-            disjunctiveFacets = state.disjunctiveFacets,
-            maxValuesPerFacet = state.maxValuesPerFacet,
-            currentState = _objectWithoutProperties(state, ["page", "facets", "hierarchicalFacets", "disjunctiveFacets", "maxValuesPerFacet"]);
+        if (!results) {
+          showPrevious = getShowPrevious(helper, cachedHits);
+          showMore = getShowMore(helper, cachedHits);
+          sendEvent = (0, _utils.createSendEventForHits)({
+            instantSearchInstance: instantSearchInstance,
+            index: helper.getIndex(),
+            widgetType: this.$$type
+          });
+          bindEvent = (0, _utils.createBindEventForHits)({
+            index: helper.getIndex(),
+            widgetType: this.$$type
+          });
+          isFirstPage = helper.state.page === undefined || getFirstReceivedPage(helper.state, cachedHits) === 0;
+        } else {
+          var _state$page3 = state.page,
+              _page = _state$page3 === void 0 ? 0 : _state$page3;
 
-        currentState.facetsRefinements = filterEmptyRefinements(currentState.facetsRefinements);
-        currentState.hierarchicalFacetsRefinements = filterEmptyRefinements(currentState.hierarchicalFacetsRefinements);
-        currentState.disjunctiveFacetsRefinements = filterEmptyRefinements(currentState.disjunctiveFacetsRefinements);
-        currentState.numericRefinements = filterEmptyRefinements(currentState.numericRefinements);
+          if (escapeHTML && results.hits.length > 0) {
+            results.hits = (0, _escapeHighlight.default)(results.hits);
+          }
 
-        if (!(0, _utils.isEqual)(currentState, prevState)) {
-          hitsCache = [];
-          firstReceivedPage = page;
-          lastReceivedPage = page;
-          prevState = currentState;
+          var initialEscaped = results.hits.__escaped;
+          results.hits = (0, _utils.addAbsolutePosition)(results.hits, results.page, results.hitsPerPage);
+          results.hits = (0, _utils.addQueryID)(results.hits, results.queryID);
+          results.hits = transformItems(results.hits); // Make sure the escaped tag stays after mapping over the hits.
+          // This prevents the hits from being double-escaped if there are multiple
+          // hits widgets mounted on the page.
+
+          results.hits.__escaped = initialEscaped;
+
+          if (cachedHits[_page] === undefined) {
+            cachedHits[_page] = results.hits;
+            cache.write({
+              state: state,
+              hits: cachedHits
+            });
+          }
+
+          currentPageHits = results.hits;
+          isFirstPage = getFirstReceivedPage(state, cachedHits) === 0;
         }
 
-        if (escapeHTML && results.hits.length > 0) {
-          results.hits = (0, _escapeHighlight.default)(results.hits);
-        }
-
-        var initialEscaped = results.hits.__escaped;
-        results.hits = (0, _utils.addAbsolutePosition)(results.hits, results.page, results.hitsPerPage);
-        results.hits = (0, _utils.addQueryID)(results.hits, results.queryID);
-        results.hits = transformItems(results.hits); // Make sure the escaped tag stays after mapping over the hits.
-        // This prevents the hits from being double-escaped if there are multiple
-        // hits widgets mounted on the page.
-
-        results.hits.__escaped = initialEscaped;
-
-        if (lastReceivedPage < page || !hitsCache.length) {
-          hitsCache = [].concat(_toConsumableArray(hitsCache), _toConsumableArray(results.hits));
-          lastReceivedPage = page;
-        } else if (firstReceivedPage > page) {
-          hitsCache = [].concat(_toConsumableArray(results.hits), _toConsumableArray(hitsCache));
-          firstReceivedPage = page;
-        }
-
-        var isFirstPage = firstReceivedPage === 0;
-        var isLastPage = results.nbPages <= results.page + 1;
-        renderFn({
-          hits: hitsCache,
+        var hits = extractHitsFromCachedHits(cachedHits);
+        var isLastPage = results ? results.nbPages <= getLastReceivedPage(state, cachedHits) + 1 : true;
+        return {
+          hits: hits,
+          currentPageHits: currentPageHits,
+          sendEvent: sendEvent,
+          bindEvent: bindEvent,
           results: results,
           showPrevious: showPrevious,
           showMore: showMore,
           isFirstPage: isFirstPage,
           isLastPage: isLastPage,
-          instantSearchInstance: instantSearchInstance,
           widgetParams: widgetParams
-        }, false);
+        };
       },
-      dispose: function dispose(_ref4) {
-        var state = _ref4.state;
+      dispose: function dispose(_ref6) {
+        var state = _ref6.state;
         unmountFn();
         var stateWithoutPage = state.setQueryParameter('page', undefined);
 
@@ -24832,11 +24953,13 @@ var connectInfiniteHits = function connectInfiniteHits(renderFn) {
           return _objectSpread({}, acc, _defineProperty({}, key, undefined));
         }, {}));
       },
-      getWidgetState: function getWidgetState(uiState, _ref5) {
-        var searchParameters = _ref5.searchParameters;
+      getWidgetUiState: function getWidgetUiState(uiState, _ref7) {
+        var searchParameters = _ref7.searchParameters;
         var page = searchParameters.page || 0;
 
-        if (!hasShowPrevious || !page) {
+        if (!page) {
+          // return without adding `page` to uiState
+          // because we don't want `page=1` in the URL
           return uiState;
         }
 
@@ -24846,8 +24969,8 @@ var connectInfiniteHits = function connectInfiniteHits(renderFn) {
           page: page + 1
         });
       },
-      getWidgetSearchParameters: function getWidgetSearchParameters(searchParameters, _ref6) {
-        var uiState = _ref6.uiState;
+      getWidgetSearchParameters: function getWidgetSearchParameters(searchParameters, _ref8) {
+        var uiState = _ref8.uiState;
         var widgetSearchParameters = searchParameters;
 
         if (escapeHTML) {
@@ -24928,7 +25051,8 @@ var renderer = function renderer(_ref) {
         isFirstPage = _ref2.isFirstPage,
         isLastPage = _ref2.isLastPage,
         instantSearchInstance = _ref2.instantSearchInstance,
-        insights = _ref2.insights;
+        insights = _ref2.insights,
+        bindEvent = _ref2.bindEvent;
 
     if (isFirstRendering) {
       renderState.templateProps = (0, _utils.prepareTemplateProps)({
@@ -24949,7 +25073,11 @@ var renderer = function renderer(_ref) {
       templateProps: renderState.templateProps,
       isFirstPage: isFirstPage,
       isLastPage: isLastPage,
-      insights: insights
+      insights: insights,
+      sendEvent: function sendEvent(event) {
+        instantSearchInstance.sendEventToInsights(event);
+      },
+      bindEvent: bindEvent
     }), containerNode);
   };
 };
@@ -24963,7 +25091,8 @@ var infiniteHits = function infiniteHits() {
       templates = _ref3$templates === void 0 ? _defaultTemplates.default : _ref3$templates,
       _ref3$cssClasses = _ref3.cssClasses,
       userCssClasses = _ref3$cssClasses === void 0 ? {} : _ref3$cssClasses,
-      showPrevious = _ref3.showPrevious;
+      showPrevious = _ref3.showPrevious,
+      cache = _ref3.cache;
 
   if (!container) {
     throw new Error(withUsage('The `container` option is required.'));
@@ -25009,7 +25138,8 @@ var infiniteHits = function infiniteHits() {
   return makeInfiniteHits({
     escapeHTML: escapeHTML,
     transformItems: transformItems,
-    showPrevious: showPrevious
+    showPrevious: showPrevious,
+    cache: cache
   });
 };
 
@@ -25024,55 +25154,6 @@ Object.defineProperty(exports, "__esModule", {
 exports.default = connectMenu;
 
 var _utils = require("../../lib/utils");
-
-function ownKeys(object, enumerableOnly) {
-  var keys = Object.keys(object);
-
-  if (Object.getOwnPropertySymbols) {
-    var symbols = Object.getOwnPropertySymbols(object);
-    if (enumerableOnly) symbols = symbols.filter(function (sym) {
-      return Object.getOwnPropertyDescriptor(object, sym).enumerable;
-    });
-    keys.push.apply(keys, symbols);
-  }
-
-  return keys;
-}
-
-function _objectSpread(target) {
-  for (var i = 1; i < arguments.length; i++) {
-    var source = arguments[i] != null ? arguments[i] : {};
-
-    if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
-        _defineProperty(target, key, source[key]);
-      });
-    } else if (Object.getOwnPropertyDescriptors) {
-      Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
-    } else {
-      ownKeys(source).forEach(function (key) {
-        Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
-      });
-    }
-  }
-
-  return target;
-}
-
-function _defineProperty(obj, key, value) {
-  if (key in obj) {
-    Object.defineProperty(obj, key, {
-      value: value,
-      enumerable: true,
-      configurable: true,
-      writable: true
-    });
-  } else {
-    obj[key] = value;
-  }
-
-  return obj;
-}
 
 function _objectWithoutProperties(source, excluded) {
   if (source == null) return {};
@@ -25150,6 +25231,55 @@ function _iterableToArrayLimit(arr, i) {
 
 function _arrayWithHoles(arr) {
   if (Array.isArray(arr)) return arr;
+}
+
+function ownKeys(object, enumerableOnly) {
+  var keys = Object.keys(object);
+
+  if (Object.getOwnPropertySymbols) {
+    var symbols = Object.getOwnPropertySymbols(object);
+    if (enumerableOnly) symbols = symbols.filter(function (sym) {
+      return Object.getOwnPropertyDescriptor(object, sym).enumerable;
+    });
+    keys.push.apply(keys, symbols);
+  }
+
+  return keys;
+}
+
+function _objectSpread(target) {
+  for (var i = 1; i < arguments.length; i++) {
+    var source = arguments[i] != null ? arguments[i] : {};
+
+    if (i % 2) {
+      ownKeys(Object(source), true).forEach(function (key) {
+        _defineProperty(target, key, source[key]);
+      });
+    } else if (Object.getOwnPropertyDescriptors) {
+      Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
+    } else {
+      ownKeys(Object(source)).forEach(function (key) {
+        Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
+      });
+    }
+  }
+
+  return target;
+}
+
+function _defineProperty(obj, key, value) {
+  if (key in obj) {
+    Object.defineProperty(obj, key, {
+      value: value,
+      enumerable: true,
+      configurable: true,
+      writable: true
+    });
+  } else {
+    obj[key] = value;
+  }
+
+  return obj;
 }
 
 var withUsage = (0, _utils.createDocumentationMessageGenerator)({
@@ -25266,15 +25396,18 @@ function connectMenu(renderFn) {
       throw new Error(withUsage('The `showMoreLimit` option must be greater than `limit`.'));
     }
 
+    var sendEvent; // Provide the same function to the `renderFn` so that way the user
+    // has to only bind it once when `isFirstRendering` for instance
+
+    var toggleShowMore = function toggleShowMore() {};
+
+    function cachedToggleShowMore() {
+      toggleShowMore();
+    }
+
     return {
       $$type: 'ais.menu',
       isShowingMore: false,
-      // Provide the same function to the `renderFn` so that way the user
-      // has to only bind it once when `isFirstRendering` for instance
-      toggleShowMore: function toggleShowMore() {},
-      cachedToggleShowMore: function cachedToggleShowMore() {
-        this.toggleShowMore();
-      },
       createToggleShowMore: function createToggleShowMore(_ref) {
         var _this = this;
 
@@ -25292,78 +25425,99 @@ function connectMenu(renderFn) {
       getLimit: function getLimit() {
         return this.isShowingMore ? showMoreLimit : limit;
       },
-      refine: function refine(helper) {
-        return function (facetValue) {
-          var _helper$getHierarchic = helper.getHierarchicalFacetBreadcrumb(attribute),
-              _helper$getHierarchic2 = _slicedToArray(_helper$getHierarchic, 1),
-              refinedItem = _helper$getHierarchic2[0];
-
-          helper.toggleRefinement(attribute, facetValue ? facetValue : refinedItem).search();
-        };
-      },
-      init: function init(_ref2) {
-        var helper = _ref2.helper,
-            createURL = _ref2.createURL,
-            instantSearchInstance = _ref2.instantSearchInstance;
-        this.cachedToggleShowMore = this.cachedToggleShowMore.bind(this);
-
-        this._createURL = function (facetValue) {
-          return createURL(helper.state.toggleRefinement(attribute, facetValue));
-        };
-
-        this._refine = this.refine(helper);
-        renderFn({
-          items: [],
-          createURL: this._createURL,
-          refine: this._refine,
-          instantSearchInstance: instantSearchInstance,
-          canRefine: false,
-          widgetParams: widgetParams,
-          isShowingMore: this.isShowingMore,
-          toggleShowMore: this.cachedToggleShowMore,
-          canToggleShowMore: false
-        }, true);
-      },
-      render: function render(_ref3) {
-        var results = _ref3.results,
-            instantSearchInstance = _ref3.instantSearchInstance;
-        var facetValues = results.getFacetValues(attribute, {
-          sortBy: sortBy
-        });
-        var facetItems = facetValues && facetValues.data ? facetValues.data : [];
-        var items = transformItems(facetItems.slice(0, this.getLimit()).map(function (_ref4) {
-          var label = _ref4.name,
-              value = _ref4.path,
-              item = _objectWithoutProperties(_ref4, ["name", "path"]);
-
-          return _objectSpread({}, item, {
-            label: label,
-            value: value
-          });
-        }));
-        this.toggleShowMore = this.createToggleShowMore({
-          results: results,
+      init: function init(initOptions) {
+        var instantSearchInstance = initOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(initOptions), {
           instantSearchInstance: instantSearchInstance
-        });
-        renderFn({
-          items: items,
-          createURL: this._createURL,
-          refine: this._refine,
-          instantSearchInstance: instantSearchInstance,
-          canRefine: items.length > 0,
-          widgetParams: widgetParams,
-          isShowingMore: this.isShowingMore,
-          toggleShowMore: this.cachedToggleShowMore,
-          canToggleShowMore: showMore && (this.isShowingMore || facetItems.length > this.getLimit())
-        }, false);
+        }), true);
       },
-      dispose: function dispose(_ref5) {
-        var state = _ref5.state;
+      render: function render(renderOptions) {
+        var instantSearchInstance = renderOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(renderOptions), {
+          instantSearchInstance: instantSearchInstance
+        }), false);
+      },
+      dispose: function dispose(_ref2) {
+        var state = _ref2.state;
         unmountFn();
         return state.removeHierarchicalFacet(attribute).setQueryParameter('maxValuesPerFacet', undefined);
       },
-      getWidgetState: function getWidgetState(uiState, _ref6) {
-        var searchParameters = _ref6.searchParameters;
+      getRenderState: function getRenderState(renderState, renderOptions) {
+        return _objectSpread({}, renderState, {
+          menu: this.getWidgetRenderState(renderOptions)
+        });
+      },
+      getWidgetRenderState: function getWidgetRenderState(_ref3) {
+        var results = _ref3.results,
+            createURL = _ref3.createURL,
+            instantSearchInstance = _ref3.instantSearchInstance,
+            helper = _ref3.helper;
+        var items = [];
+        var canToggleShowMore = false;
+
+        if (!sendEvent) {
+          sendEvent = (0, _utils.createSendEventForFacet)({
+            instantSearchInstance: instantSearchInstance,
+            helper: helper,
+            attribute: attribute,
+            widgetType: this.$$type
+          });
+        }
+
+        if (!this._createURL) {
+          this._createURL = function (facetValue) {
+            return createURL(helper.state.toggleRefinement(attribute, facetValue));
+          };
+        }
+
+        if (!this._refine) {
+          this._refine = function (facetValue) {
+            var _helper$getHierarchic = helper.getHierarchicalFacetBreadcrumb(attribute),
+                _helper$getHierarchic2 = _slicedToArray(_helper$getHierarchic, 1),
+                refinedItem = _helper$getHierarchic2[0];
+
+            sendEvent('click', facetValue ? facetValue : refinedItem);
+            helper.toggleRefinement(attribute, facetValue ? facetValue : refinedItem).search();
+          };
+        }
+
+        toggleShowMore = this.createToggleShowMore({
+          results: results,
+          instantSearchInstance: instantSearchInstance
+        });
+
+        if (results) {
+          var facetValues = results.getFacetValues(attribute, {
+            sortBy: sortBy
+          });
+          var facetItems = facetValues && facetValues.data ? facetValues.data : [];
+          canToggleShowMore = showMore && (this.isShowingMore || facetItems.length > this.getLimit());
+          items = transformItems(facetItems.slice(0, this.getLimit()).map(function (_ref4) {
+            var label = _ref4.name,
+                value = _ref4.path,
+                item = _objectWithoutProperties(_ref4, ["name", "path"]);
+
+            return _objectSpread({}, item, {
+              label: label,
+              value: value
+            });
+          }));
+        }
+
+        return {
+          items: items,
+          createURL: this._createURL,
+          refine: this._refine,
+          sendEvent: sendEvent,
+          canRefine: items.length > 0,
+          widgetParams: widgetParams,
+          isShowingMore: this.isShowingMore,
+          toggleShowMore: cachedToggleShowMore,
+          canToggleShowMore: canToggleShowMore
+        };
+      },
+      getWidgetUiState: function getWidgetUiState(uiState, _ref5) {
+        var searchParameters = _ref5.searchParameters;
 
         var _searchParameters$get = searchParameters.getHierarchicalFacetBreadcrumb(attribute),
             _searchParameters$get2 = _slicedToArray(_searchParameters$get, 1),
@@ -25377,8 +25531,8 @@ function connectMenu(renderFn) {
           menu: _objectSpread({}, uiState.menu, _defineProperty({}, attribute, value))
         });
       },
-      getWidgetSearchParameters: function getWidgetSearchParameters(searchParameters, _ref7) {
-        var uiState = _ref7.uiState;
+      getWidgetSearchParameters: function getWidgetSearchParameters(searchParameters, _ref6) {
+        var uiState = _ref6.uiState;
         var value = uiState.menu && uiState.menu[attribute];
         var withFacetConfiguration = searchParameters.removeHierarchicalFacet(attribute).addHierarchicalFacet({
           name: attribute,
@@ -25456,13 +25610,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -25694,13 +25848,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -25914,98 +26068,58 @@ function connectRefinementList(renderFn) {
       return isShowingMore ? showMoreLimit : limit;
     };
 
-    var lastResultsFromMainSearch = [];
+    var lastResultsFromMainSearch;
+    var lastItemsFromMainSearch = [];
     var hasExhaustiveItems = true;
     var searchForFacetValues;
     var triggerRefine;
-
-    var _render = function render(_ref2) {
-      var items = _ref2.items,
-          state = _ref2.state,
-          createURL = _ref2.createURL,
-          helperSpecializedSearchFacetValues = _ref2.helperSpecializedSearchFacetValues,
-          refine = _ref2.refine,
-          isFromSearch = _ref2.isFromSearch,
-          isFirstSearch = _ref2.isFirstSearch,
-          isShowingMore = _ref2.isShowingMore,
-          toggleShowMore = _ref2.toggleShowMore,
-          instantSearchInstance = _ref2.instantSearchInstance; // Compute a specific createURL method able to link to any facet value state change
-
-      var _createURL = function _createURL(facetValue) {
-        return createURL(state.toggleRefinement(attribute, facetValue));
-      }; // Do not mistake searchForFacetValues and searchFacetValues which is the actual search
-      // function
-
-
-      var searchFacetValues = helperSpecializedSearchFacetValues && helperSpecializedSearchFacetValues(state, createURL, helperSpecializedSearchFacetValues, refine, instantSearchInstance, isShowingMore);
-      var canShowLess = isShowingMore && lastResultsFromMainSearch.length > limit;
-      var canShowMore = showMore && !isFromSearch && !hasExhaustiveItems;
-      var canToggleShowMore = canShowLess || canShowMore;
-      renderFn({
-        createURL: _createURL,
-        items: items,
-        refine: refine,
-        searchForItems: searchFacetValues,
-        instantSearchInstance: instantSearchInstance,
-        isFromSearch: isFromSearch,
-        canRefine: isFromSearch || items.length > 0,
-        widgetParams: widgetParams,
-        isShowingMore: isShowingMore,
-        canToggleShowMore: canToggleShowMore,
-        toggleShowMore: toggleShowMore,
-        hasExhaustiveItems: hasExhaustiveItems
-      }, isFirstSearch);
-    };
+    var sendEvent;
+    var toggleShowMore;
     /* eslint-disable max-params */
 
+    var createSearchForFacetValues = function createSearchForFacetValues(helper) {
+      var _this = this;
 
-    var createSearchForFacetValues = function createSearchForFacetValues(helper, toggleShowMore) {
-      return function (state, createURL, helperSpecializedSearchFacetValues, toggleRefinement, instantSearchInstance, isShowingMore) {
+      return function (renderOptions) {
         return function (query) {
-          if (query === '' && lastResultsFromMainSearch) {
-            // render with previous data from the helper.
-            _render({
-              items: lastResultsFromMainSearch,
-              state: state,
-              createURL: createURL,
-              helperSpecializedSearchFacetValues: helperSpecializedSearchFacetValues,
-              refine: toggleRefinement,
-              isFromSearch: false,
-              isFirstSearch: false,
-              instantSearchInstance: instantSearchInstance,
-              toggleShowMore: toggleShowMore,
-              // and yet it will be
-              isShowingMore: isShowingMore // so we need to restore in the state of show more as well
+          var instantSearchInstance = renderOptions.instantSearchInstance;
 
-            });
+          if (query === '' && lastItemsFromMainSearch) {
+            // render with previous data from the helper.
+            renderFn(_objectSpread({}, _this.getWidgetRenderState(_objectSpread({}, renderOptions, {
+              results: lastResultsFromMainSearch
+            })), {
+              instantSearchInstance: instantSearchInstance
+            }));
           } else {
             var tags = {
               highlightPreTag: escapeFacetValues ? _escapeHighlight.TAG_PLACEHOLDER.highlightPreTag : _escapeHighlight.TAG_REPLACEMENT.highlightPreTag,
               highlightPostTag: escapeFacetValues ? _escapeHighlight.TAG_PLACEHOLDER.highlightPostTag : _escapeHighlight.TAG_REPLACEMENT.highlightPostTag
             };
-            helper.searchForFacetValues(attribute, query, _getLimit(isShowingMore), tags).then(function (results) {
+            helper.searchForFacetValues(attribute, query, // We cap the `maxFacetHits` value to 100 because the Algolia API
+            // doesn't support a greater number.
+            // See https://www.algolia.com/doc/api-reference/api-parameters/maxFacetHits/
+            Math.min(_getLimit(_this.isShowingMore), 100), tags).then(function (results) {
               var facetValues = escapeFacetValues ? (0, _escapeHighlight.escapeFacets)(results.facetHits) : results.facetHits;
-              var normalizedFacetValues = transformItems(facetValues.map(function (_ref3) {
-                var value = _ref3.value,
-                    item = _objectWithoutProperties(_ref3, ["value"]);
+              var normalizedFacetValues = transformItems(facetValues.map(function (_ref2) {
+                var value = _ref2.value,
+                    item = _objectWithoutProperties(_ref2, ["value"]);
 
                 return _objectSpread({}, item, {
                   value: value,
                   label: value
                 });
               }));
-
-              _render({
+              var canToggleShowMore = _this.isShowingMore && lastItemsFromMainSearch.length > limit;
+              renderFn(_objectSpread({}, _this.getWidgetRenderState(_objectSpread({}, renderOptions, {
+                results: lastResultsFromMainSearch
+              })), {
                 items: normalizedFacetValues,
-                state: state,
-                createURL: createURL,
-                helperSpecializedSearchFacetValues: helperSpecializedSearchFacetValues,
-                refine: toggleRefinement,
-                isFromSearch: true,
-                isFirstSearch: false,
+                canToggleShowMore: canToggleShowMore,
+                canRefine: true,
                 instantSearchInstance: instantSearchInstance,
-                isShowingMore: isShowingMore
-              });
+                isFromSearch: true
+              }));
             });
           }
         };
@@ -26021,81 +26135,123 @@ function connectRefinementList(renderFn) {
       // has to only bind it once when `isFirstRendering` for instance
       toggleShowMore: function toggleShowMore() {},
       cachedToggleShowMore: function cachedToggleShowMore() {
-        this.toggleShowMore();
+        toggleShowMore();
       },
       createToggleShowMore: function createToggleShowMore(renderOptions) {
-        var _this = this;
+        var _this2 = this;
 
         return function () {
-          _this.isShowingMore = !_this.isShowingMore;
+          _this2.isShowingMore = !_this2.isShowingMore;
 
-          _this.render(renderOptions);
+          _this2.render(renderOptions);
         };
       },
       getLimit: function getLimit() {
         return _getLimit(this.isShowingMore);
       },
-      init: function init(_ref4) {
-        var helper = _ref4.helper,
-            createURL = _ref4.createURL,
-            instantSearchInstance = _ref4.instantSearchInstance;
-        this.cachedToggleShowMore = this.cachedToggleShowMore.bind(this);
-
-        triggerRefine = function triggerRefine(facetValue) {
-          return helper.toggleRefinement(attribute, facetValue).search();
-        };
-
-        searchForFacetValues = createSearchForFacetValues(helper, this.cachedToggleShowMore);
-
-        _render({
-          items: [],
-          state: helper.state,
-          createURL: createURL,
-          helperSpecializedSearchFacetValues: searchForFacetValues,
-          refine: triggerRefine,
-          isFromSearch: false,
-          isFirstSearch: true,
-          instantSearchInstance: instantSearchInstance,
-          isShowingMore: this.isShowingMore,
-          toggleShowMore: this.cachedToggleShowMore
-        });
+      init: function init(initOptions) {
+        renderFn(_objectSpread({}, this.getWidgetRenderState(initOptions), {
+          instantSearchInstance: initOptions.instantSearchInstance
+        }), true);
       },
       render: function render(renderOptions) {
+        renderFn(_objectSpread({}, this.getWidgetRenderState(renderOptions), {
+          instantSearchInstance: renderOptions.instantSearchInstance
+        }), false);
+      },
+      getRenderState: function getRenderState(renderState, renderOptions) {
+        return _objectSpread({}, renderState, {
+          refinementList: _objectSpread({}, renderState.refinementList, _defineProperty({}, attribute, this.getWidgetRenderState(renderOptions)))
+        });
+      },
+      getWidgetRenderState: function getWidgetRenderState(renderOptions) {
         var results = renderOptions.results,
             state = renderOptions.state,
             createURL = renderOptions.createURL,
-            instantSearchInstance = renderOptions.instantSearchInstance;
-        var facetValues = results.getFacetValues(attribute, {
-          sortBy: sortBy
-        }) || [];
-        var items = transformItems(facetValues.slice(0, this.getLimit()).map(formatItems));
-        var maxValuesPerFacetConfig = state.maxValuesPerFacet;
-        var currentLimit = this.getLimit(); // If the limit is the max number of facet retrieved it is impossible to know
-        // if the facets are exhaustive. The only moment we are sure it is exhaustive
-        // is when it is strictly under the number requested unless we know that another
-        // widget has requested more values (maxValuesPerFacet > getLimit()).
-        // Because this is used for making the search of facets unable or not, it is important
-        // to be conservative here.
+            instantSearchInstance = renderOptions.instantSearchInstance,
+            _renderOptions$isFrom = renderOptions.isFromSearch,
+            isFromSearch = _renderOptions$isFrom === void 0 ? false : _renderOptions$isFrom,
+            helper = renderOptions.helper;
+        var items = [];
+        var facetValues;
 
-        hasExhaustiveItems = maxValuesPerFacetConfig > currentLimit ? facetValues.length <= currentLimit : facetValues.length < currentLimit;
-        lastResultsFromMainSearch = items;
-        this.toggleShowMore = this.createToggleShowMore(renderOptions);
+        if (!sendEvent || !triggerRefine || !searchForFacetValues) {
+          sendEvent = (0, _utils.createSendEventForFacet)({
+            instantSearchInstance: instantSearchInstance,
+            helper: helper,
+            attribute: attribute,
+            widgetType: this.$$type
+          });
 
-        _render({
+          triggerRefine = function triggerRefine(facetValue) {
+            sendEvent('click', facetValue);
+            helper.toggleRefinement(attribute, facetValue).search();
+          };
+
+          searchForFacetValues = createSearchForFacetValues.call(this, helper);
+        }
+
+        if (results) {
+          if (!isFromSearch) {
+            facetValues = results.getFacetValues(attribute, {
+              sortBy: sortBy
+            }) || [];
+            items = transformItems(facetValues.slice(0, this.getLimit()).map(formatItems));
+          } else {
+            facetValues = escapeFacetValues ? (0, _escapeHighlight.escapeFacets)(results.facetHits) : results.facetHits;
+            items = transformItems(facetValues.map(function (_ref3) {
+              var value = _ref3.value,
+                  item = _objectWithoutProperties(_ref3, ["value"]);
+
+              return _objectSpread({}, item, {
+                value: value,
+                label: value
+              });
+            }));
+          }
+
+          var maxValuesPerFacetConfig = state.maxValuesPerFacet;
+          var currentLimit = this.getLimit(); // If the limit is the max number of facet retrieved it is impossible to know
+          // if the facets are exhaustive. The only moment we are sure it is exhaustive
+          // is when it is strictly under the number requested unless we know that another
+          // widget has requested more values (maxValuesPerFacet > getLimit()).
+          // Because this is used for making the search of facets unable or not, it is important
+          // to be conservative here.
+
+          hasExhaustiveItems = maxValuesPerFacetConfig > currentLimit ? facetValues.length <= currentLimit : facetValues.length < currentLimit;
+          lastResultsFromMainSearch = results;
+          lastItemsFromMainSearch = items;
+          toggleShowMore = this.createToggleShowMore(renderOptions);
+        } // Compute a specific createURL method able to link to any facet value state change
+
+
+        var _createURL = function _createURL(facetValue) {
+          return createURL(state.toggleRefinement(attribute, facetValue));
+        }; // Do not mistake searchForFacetValues and searchFacetValues which is the actual search
+        // function
+
+
+        var searchFacetValues = searchForFacetValues && searchForFacetValues(renderOptions);
+        var canShowLess = this.isShowingMore && lastItemsFromMainSearch.length > limit;
+        var canShowMore = showMore && !isFromSearch && !hasExhaustiveItems;
+        var canToggleShowMore = canShowLess || canShowMore;
+        return {
+          createURL: _createURL,
           items: items,
-          state: state,
-          createURL: createURL,
-          helperSpecializedSearchFacetValues: searchForFacetValues,
           refine: triggerRefine,
-          isFromSearch: false,
-          isFirstSearch: false,
-          instantSearchInstance: instantSearchInstance,
+          searchForItems: searchFacetValues,
+          isFromSearch: isFromSearch,
+          canRefine: isFromSearch || items.length > 0,
+          widgetParams: widgetParams,
           isShowingMore: this.isShowingMore,
-          toggleShowMore: this.cachedToggleShowMore
-        });
+          canToggleShowMore: canToggleShowMore,
+          toggleShowMore: this.cachedToggleShowMore,
+          sendEvent: sendEvent,
+          hasExhaustiveItems: hasExhaustiveItems
+        };
       },
-      dispose: function dispose(_ref5) {
-        var state = _ref5.state;
+      dispose: function dispose(_ref4) {
+        var state = _ref4.state;
         unmountFn();
         var withoutMaxValuesPerFacet = state.setQueryParameter('maxValuesPerFacet', undefined);
 
@@ -26105,8 +26261,8 @@ function connectRefinementList(renderFn) {
 
         return withoutMaxValuesPerFacet.removeDisjunctiveFacet(attribute);
       },
-      getWidgetState: function getWidgetState(uiState, _ref6) {
-        var searchParameters = _ref6.searchParameters;
+      getWidgetUiState: function getWidgetUiState(uiState, _ref5) {
+        var searchParameters = _ref5.searchParameters;
         var values = operator === 'or' ? searchParameters.getDisjunctiveRefinements(attribute) : searchParameters.getConjunctiveRefinements(attribute);
 
         if (!values.length) {
@@ -26117,8 +26273,8 @@ function connectRefinementList(renderFn) {
           refinementList: _objectSpread({}, uiState.refinementList, _defineProperty({}, attribute, values))
         });
       },
-      getWidgetSearchParameters: function getWidgetSearchParameters(searchParameters, _ref7) {
-        var uiState = _ref7.uiState;
+      getWidgetSearchParameters: function getWidgetSearchParameters(searchParameters, _ref6) {
+        var uiState = _ref6.uiState;
         var isDisjunctive = operator === 'or';
         var values = uiState.refinementList && uiState.refinementList[attribute];
         var withoutRefinements = searchParameters.clearRefinements(attribute);
@@ -26128,9 +26284,8 @@ function connectRefinementList(renderFn) {
         var withMaxValuesPerFacet = withFacetConfiguration.setQueryParameter('maxValuesPerFacet', nextMaxValuesPerFacet);
 
         if (!values) {
-          var _key = isDisjunctive ? 'disjunctiveFacetsRefinements' : 'facetsRefinements';
-
-          return withMaxValuesPerFacet.setQueryParameters(_defineProperty({}, _key, _objectSpread({}, withMaxValuesPerFacet[_key], _defineProperty({}, attribute, []))));
+          var key = isDisjunctive ? 'disjunctiveFacetsRefinements' : 'facetsRefinements';
+          return withMaxValuesPerFacet.setQueryParameters(_defineProperty({}, key, _objectSpread({}, withMaxValuesPerFacet[key], _defineProperty({}, attribute, []))));
         }
 
         return values.reduce(function (parameters, value) {
@@ -26140,23 +26295,43 @@ function connectRefinementList(renderFn) {
     };
   };
 }
-},{"../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js","../../lib/escape-highlight":"node_modules/instantsearch.js/es/lib/escape-highlight.js"}],"node_modules/instantsearch.js/es/widgets/refinement-list/defaultTemplates.js":[function(require,module,exports) {
+},{"../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js","../../lib/escape-highlight":"node_modules/instantsearch.js/es/lib/escape-highlight.js"}],"node_modules/instantsearch.js/es/widgets/search-box/defaultTemplates.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
 exports.default = void 0;
+
+/* eslint max-len: 0 */
 var _default = {
-  item: "<label class=\"{{cssClasses.label}}\">\n  <input type=\"checkbox\"\n         class=\"{{cssClasses.checkbox}}\"\n         value=\"{{value}}\"\n         {{#isRefined}}checked{{/isRefined}} />\n  <span class=\"{{cssClasses.labelText}}\">{{{highlighted}}}</span>\n  <span class=\"{{cssClasses.count}}\">{{#helpers.formatNumber}}{{count}}{{/helpers.formatNumber}}</span>\n</label>",
-  showMoreText: "\n    {{#isShowingMore}}\n      Show less\n    {{/isShowingMore}}\n    {{^isShowingMore}}\n      Show more\n    {{/isShowingMore}}\n    ",
-  searchableNoResults: 'No results',
-  searchableReset: "\n  <svg class=\"{{cssClasses.resetIcon}}\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 20 20\" width=\"10\" height=\"10\">\n    <path d=\"M8.114 10L.944 2.83 0 1.885 1.886 0l.943.943L10 8.113l7.17-7.17.944-.943L20 1.886l-.943.943-7.17 7.17 7.17 7.17.943.944L18.114 20l-.943-.943-7.17-7.17-7.17 7.17-.944.943L0 18.114l.943-.943L8.113 10z\"></path>\n  </svg>\n    ",
-  searchableSubmit: "\n  <svg class=\"{{cssClasses.submitIcon}}\" xmlns=\"http://www.w3.org/2000/svg\" width=\"10\" height=\"10\" viewBox=\"0 0 40 40\">\n    <path d=\"M26.804 29.01c-2.832 2.34-6.465 3.746-10.426 3.746C7.333 32.756 0 25.424 0 16.378 0 7.333 7.333 0 16.378 0c9.046 0 16.378 7.333 16.378 16.378 0 3.96-1.406 7.594-3.746 10.426l10.534 10.534c.607.607.61 1.59-.004 2.202-.61.61-1.597.61-2.202.004L26.804 29.01zm-10.426.627c7.323 0 13.26-5.936 13.26-13.26 0-7.32-5.937-13.257-13.26-13.257C9.056 3.12 3.12 9.056 3.12 16.378c0 7.323 5.936 13.26 13.258 13.26z\"></path>\n  </svg>\n    ",
-  searchableLoadingIndicator: "\n  <svg class=\"{{cssClasses.loadingIcon}}\" width=\"16\" height=\"16\" viewBox=\"0 0 38 38\" xmlns=\"http://www.w3.org/2000/svg\" stroke=\"#444\">\n    <g fill=\"none\" fillRule=\"evenodd\">\n      <g transform=\"translate(1 1)\" strokeWidth=\"2\">\n        <circle strokeOpacity=\".5\" cx=\"18\" cy=\"18\" r=\"18\" />\n        <path d=\"M36 18c0-9.94-8.06-18-18-18\">\n          <animateTransform\n            attributeName=\"transform\"\n            type=\"rotate\"\n            from=\"0 18 18\"\n            to=\"360 18 18\"\n            dur=\"1s\"\n            repeatCount=\"indefinite\"\n          />\n        </path>\n      </g>\n    </g>\n  </svg>\n    "
+  reset: "\n<svg class=\"{{cssClasses.resetIcon}}\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 20 20\" width=\"10\" height=\"10\">\n  <path d=\"M8.114 10L.944 2.83 0 1.885 1.886 0l.943.943L10 8.113l7.17-7.17.944-.943L20 1.886l-.943.943-7.17 7.17 7.17 7.17.943.944L18.114 20l-.943-.943-7.17-7.17-7.17 7.17-.944.943L0 18.114l.943-.943L8.113 10z\"></path>\n</svg>\n  ",
+  submit: "\n<svg class=\"{{cssClasses.submitIcon}}\" xmlns=\"http://www.w3.org/2000/svg\" width=\"10\" height=\"10\" viewBox=\"0 0 40 40\">\n  <path d=\"M26.804 29.01c-2.832 2.34-6.465 3.746-10.426 3.746C7.333 32.756 0 25.424 0 16.378 0 7.333 7.333 0 16.378 0c9.046 0 16.378 7.333 16.378 16.378 0 3.96-1.406 7.594-3.746 10.426l10.534 10.534c.607.607.61 1.59-.004 2.202-.61.61-1.597.61-2.202.004L26.804 29.01zm-10.426.627c7.323 0 13.26-5.936 13.26-13.26 0-7.32-5.937-13.257-13.26-13.257C9.056 3.12 3.12 9.056 3.12 16.378c0 7.323 5.936 13.26 13.258 13.26z\"></path>\n</svg>\n  ",
+  loadingIndicator: "\n<svg class=\"{{cssClasses.loadingIcon}}\" width=\"16\" height=\"16\" viewBox=\"0 0 38 38\" xmlns=\"http://www.w3.org/2000/svg\" stroke=\"#444\">\n  <g fill=\"none\" fillRule=\"evenodd\">\n    <g transform=\"translate(1 1)\" strokeWidth=\"2\">\n      <circle strokeOpacity=\".5\" cx=\"18\" cy=\"18\" r=\"18\" />\n      <path d=\"M36 18c0-9.94-8.06-18-18-18\">\n        <animateTransform\n          attributeName=\"transform\"\n          type=\"rotate\"\n          from=\"0 18 18\"\n          to=\"360 18 18\"\n          dur=\"1s\"\n          repeatCount=\"indefinite\"\n        />\n      </path>\n    </g>\n  </g>\n</svg>\n  "
 };
 exports.default = _default;
-},{}],"node_modules/instantsearch.js/es/widgets/refinement-list/refinement-list.js":[function(require,module,exports) {
+},{}],"node_modules/instantsearch.js/es/widgets/refinement-list/defaultTemplates.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _defaultTemplates = _interopRequireDefault(require("../search-box/defaultTemplates"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var _default = {
+  item: "<label class=\"{{cssClasses.label}}\">\n  <input type=\"checkbox\"\n         class=\"{{cssClasses.checkbox}}\"\n         value=\"{{value}}\"\n         {{#isRefined}}checked{{/isRefined}} />\n  <span class=\"{{cssClasses.labelText}}\">{{#isFromSearch}}{{{highlighted}}}{{/isFromSearch}}{{^isFromSearch}}{{highlighted}}{{/isFromSearch}}</span>\n  <span class=\"{{cssClasses.count}}\">{{#helpers.formatNumber}}{{count}}{{/helpers.formatNumber}}</span>\n</label>",
+  showMoreText: "\n    {{#isShowingMore}}\n      Show less\n    {{/isShowingMore}}\n    {{^isShowingMore}}\n      Show more\n    {{/isShowingMore}}\n    ",
+  searchableNoResults: 'No results',
+  searchableReset: _defaultTemplates.default.reset,
+  searchableSubmit: _defaultTemplates.default.submit,
+  searchableLoadingIndicator: _defaultTemplates.default.loadingIndicator
+};
+exports.default = _default;
+},{"../search-box/defaultTemplates":"node_modules/instantsearch.js/es/widgets/search-box/defaultTemplates.js"}],"node_modules/instantsearch.js/es/widgets/refinement-list/refinement-list.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -26235,13 +26410,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -26628,13 +26803,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -26662,20 +26837,65 @@ var withUsage = (0, _utils.createDocumentationMessageGenerator)({
   name: 'numeric-menu',
   connector: true
 });
+var $$type = 'ais.numericMenu';
+
+var createSendEvent = function createSendEvent(_ref) {
+  var instantSearchInstance = _ref.instantSearchInstance,
+      helper = _ref.helper,
+      attribute = _ref.attribute;
+  return function () {
+    for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
+      args[_key] = arguments[_key];
+    }
+
+    if (args.length === 1) {
+      instantSearchInstance.sendEventToInsights(args[0]);
+      return;
+    }
+
+    var eventType = args[0],
+        facetValue = args[1],
+        _args$ = args[2],
+        eventName = _args$ === void 0 ? 'Filter Applied' : _args$;
+
+    if (eventType !== 'click') {
+      return;
+    } // facetValue === "%7B%22start%22:5,%22end%22:10%7D"
+
+
+    var filters = (0, _utils.convertNumericRefinementsToFilters)(getRefinedState(helper.state, attribute, facetValue), attribute);
+
+    if (filters && filters.length > 0) {
+      /*
+          filters === ["price<=10", "price>=5"]
+        */
+      instantSearchInstance.sendEventToInsights({
+        insightsMethod: 'clickedFilters',
+        widgetType: $$type,
+        eventType: eventType,
+        payload: {
+          eventName: eventName,
+          index: helper.getIndex(),
+          filters: filters
+        }
+      });
+    }
+  };
+};
 
 var connectNumericMenu = function connectNumericMenu(renderFn) {
   var unmountFn = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : _utils.noop;
   (0, _utils.checkRendering)(renderFn, withUsage());
   return function (widgetParams) {
-    var _ref = widgetParams || {},
-        _ref$attribute = _ref.attribute,
-        attribute = _ref$attribute === void 0 ? '' : _ref$attribute,
-        _ref$items = _ref.items,
-        items = _ref$items === void 0 ? [] : _ref$items,
-        _ref$transformItems = _ref.transformItems,
-        transformItems = _ref$transformItems === void 0 ? function (x) {
+    var _ref2 = widgetParams || {},
+        _ref2$attribute = _ref2.attribute,
+        attribute = _ref2$attribute === void 0 ? '' : _ref2$attribute,
+        _ref2$items = _ref2.items,
+        items = _ref2$items === void 0 ? [] : _ref2$items,
+        _ref2$transformItems = _ref2.transformItems,
+        transformItems = _ref2$transformItems === void 0 ? function (x) {
       return x;
-    } : _ref$transformItems;
+    } : _ref2$transformItems;
 
     if (attribute === '') {
       throw new Error(withUsage('The `attribute` option is required.'));
@@ -26686,10 +26906,10 @@ var connectNumericMenu = function connectNumericMenu(renderFn) {
     }
 
     var prepareItems = function prepareItems(state) {
-      return items.map(function (_ref2) {
-        var start = _ref2.start,
-            end = _ref2.end,
-            label = _ref2.label;
+      return items.map(function (_ref3) {
+        var start = _ref3.start,
+            end = _ref3.end,
+            label = _ref3.label;
         return {
           label: label,
           value: window.encodeURI(JSON.stringify({
@@ -26707,52 +26927,26 @@ var connectNumericMenu = function connectNumericMenu(renderFn) {
 
     var connectorState = {};
     return {
-      $$type: 'ais.numericMenu',
-      init: function init(_ref3) {
-        var helper = _ref3.helper,
-            createURL = _ref3.createURL,
-            instantSearchInstance = _ref3.instantSearchInstance;
-
-        connectorState.refine = function (facetValue) {
-          var refinedState = refine(helper.state, attribute, facetValue);
-          helper.setState(refinedState).search();
-        };
-
-        connectorState.createURL = function (state) {
-          return function (facetValue) {
-            return createURL(refine(state, attribute, facetValue));
-          };
-        };
-
-        renderFn({
-          createURL: connectorState.createURL(helper.state),
-          items: transformItems(prepareItems(helper.state)),
-          hasNoResults: true,
-          refine: connectorState.refine,
-          instantSearchInstance: instantSearchInstance,
-          widgetParams: widgetParams
-        }, true);
+      $$type: $$type,
+      init: function init(initOptions) {
+        var instantSearchInstance = initOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(initOptions), {
+          instantSearchInstance: instantSearchInstance
+        }), true);
       },
-      render: function render(_ref4) {
-        var results = _ref4.results,
-            state = _ref4.state,
-            instantSearchInstance = _ref4.instantSearchInstance;
-        renderFn({
-          createURL: connectorState.createURL(state),
-          items: transformItems(prepareItems(state)),
-          hasNoResults: results.nbHits === 0,
-          refine: connectorState.refine,
-          instantSearchInstance: instantSearchInstance,
-          widgetParams: widgetParams
-        }, false);
+      render: function render(renderOptions) {
+        var instantSearchInstance = renderOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(renderOptions), {
+          instantSearchInstance: instantSearchInstance
+        }), false);
       },
-      dispose: function dispose(_ref5) {
-        var state = _ref5.state;
+      dispose: function dispose(_ref4) {
+        var state = _ref4.state;
         unmountFn();
         return state.clearRefinements(attribute);
       },
-      getWidgetState: function getWidgetState(uiState, _ref6) {
-        var searchParameters = _ref6.searchParameters;
+      getWidgetUiState: function getWidgetUiState(uiState, _ref5) {
+        var searchParameters = _ref5.searchParameters;
         var values = searchParameters.getNumericRefinements(attribute);
         var equal = values['='] && values['='][0];
 
@@ -26773,8 +26967,8 @@ var connectNumericMenu = function connectNumericMenu(renderFn) {
           numericMenu: _objectSpread({}, uiState.numericMenu, _defineProperty({}, attribute, "".concat(min, ":").concat(max)))
         });
       },
-      getWidgetSearchParameters: function getWidgetSearchParameters(searchParameters, _ref7) {
-        var uiState = _ref7.uiState;
+      getWidgetSearchParameters: function getWidgetSearchParameters(searchParameters, _ref6) {
+        var uiState = _ref6.uiState;
         var value = uiState.numericMenu && uiState.numericMenu[attribute];
         var withoutRefinements = searchParameters.clearRefinements(attribute);
 
@@ -26798,6 +26992,51 @@ var connectNumericMenu = function connectNumericMenu(renderFn) {
         var withMinRefinement = (0, _utils.isFiniteNumber)(min) ? withoutRefinements.addNumericRefinement(attribute, '>=', min) : withoutRefinements;
         var withMaxRefinement = (0, _utils.isFiniteNumber)(max) ? withMinRefinement.addNumericRefinement(attribute, '<=', max) : withMinRefinement;
         return withMaxRefinement;
+      },
+      getRenderState: function getRenderState(renderState, renderOptions) {
+        return _objectSpread({}, renderState, {
+          numericMenu: _objectSpread({}, renderState.numericMenu, _defineProperty({}, attribute, this.getWidgetRenderState(renderOptions)))
+        });
+      },
+      getWidgetRenderState: function getWidgetRenderState(_ref7) {
+        var results = _ref7.results,
+            state = _ref7.state,
+            instantSearchInstance = _ref7.instantSearchInstance,
+            helper = _ref7.helper,
+            createURL = _ref7.createURL;
+
+        if (!connectorState.refine) {
+          connectorState.refine = function (facetValue) {
+            var refinedState = getRefinedState(helper.state, attribute, facetValue);
+            connectorState.sendEvent('click', facetValue);
+            helper.setState(refinedState).search();
+          };
+        }
+
+        if (!connectorState.createURL) {
+          connectorState.createURL = function (newState) {
+            return function (facetValue) {
+              return createURL(getRefinedState(newState, attribute, facetValue));
+            };
+          };
+        }
+
+        if (!connectorState.sendEvent) {
+          connectorState.sendEvent = createSendEvent({
+            instantSearchInstance: instantSearchInstance,
+            helper: helper,
+            attribute: attribute
+          });
+        }
+
+        return {
+          createURL: connectorState.createURL(state),
+          items: transformItems(prepareItems(state)),
+          hasNoResults: results ? results.nbHits === 0 : true,
+          refine: connectorState.refine,
+          sendEvent: connectorState.sendEvent,
+          widgetParams: widgetParams
+        };
       }
     };
   };
@@ -26830,7 +27069,7 @@ function isRefined(state, attribute, option) {
   return false;
 }
 
-function refine(state, attribute, facetValue) {
+function getRefinedState(state, attribute, facetValue) {
   var resolvedState = state;
   var refinedOption = JSON.parse(window.decodeURI(facetValue)); // @TODO: why is array / element mixed here & hasRefinements; seems wrong?
 
@@ -26908,7 +27147,7 @@ exports.default = _default;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.default = numericMenu;
+exports.default = void 0;
 
 var _preact = require("preact");
 
@@ -26963,73 +27202,9 @@ var renderer = function renderer(_ref) {
     }), containerNode);
   };
 };
-/**
- * @typedef {Object} NumericMenuCSSClasses
- * @property {string|string[]} [root] CSS class to add to the root element.
- * @property {string|string[]} [noRefinementRoot] CSS class to add to the root element when no refinements.
- * @property {string|string[]} [list] CSS class to add to the list element.
- * @property {string|string[]} [item] CSS class to add to each item element.
- * @property {string|string[]} [selectedItem] CSS class to add to each selected item element.
- * @property {string|string[]} [label] CSS class to add to each label element.
- * @property {string|string[]} [labelText] CSS class to add to each label text element.
- * @property {string|string[]} [radio] CSS class to add to each radio element (when using the default template).
- */
 
-/**
- * @typedef {Object} NumericMenuTemplates
- * @property {string|function} [item] Item template, provided with `label` (the name in the configuration), `isRefined`, `url`, `value` (the setting for the filter) data properties.
- */
-
-/**
- * @typedef {Object} NumericMenuOption
- * @property {string} label Label of the option.
- * @property {number} [start] Low bound of the option (>=).
- * @property {number} [end] High bound of the option (<=).
- */
-
-/**
- * @typedef {Object} NumericMenuWidgetOptions
- * @property {string|HTMLElement} container CSS Selector or HTMLElement to insert the widget.
- * @property {string} attribute Name of the attribute for filtering.
- * @property {NumericMenuOption[]} items List of all the items.
- * @property {NumericMenuTemplates} [templates] Templates to use for the widget.
- * @property {NumericMenuCSSClasses} [cssClasses] CSS classes to add to the wrapping elements.
- * @property {function(object[]):object[]} [transformItems] Function to transform the items passed to the templates.
- */
-
-/**
- * The numeric menu is a widget that displays a list of numeric filters in a list. Those numeric filters
- * are pre-configured with creating the widget.
- *
- * @requirements
- * The attribute passed to `attribute` must be declared as an [attribute for faceting](https://www.algolia.com/doc/guides/searching/faceting/#declaring-attributes-for-faceting) in your
- * Algolia settings.
- *
- * The values inside this attribute must be JavaScript numbers and not strings.
- *
- * @type {WidgetFactory}
- * @devNovel NumericMenu
- * @category filter
- * @param {NumericMenuWidgetOptions} $0 The NumericMenu widget items
- * @return {Widget} Creates a new instance of the NumericMenu widget.
- * @example
- * search.addWidgets([
- *   instantsearch.widgets.numericMenu({
- *     container: '#popularity',
- *     attribute: 'popularity',
- *     items: [
- *       { label: 'All' },
- *       { end: 500, label: 'less than 500' },
- *       { start: 500, end: 2000, label: 'between 500 and 2000' },
- *       { start: 2000, label: 'more than 2000' }
- *     ]
- *   })
- * ]);
- */
-
-
-function numericMenu() {
-  var _ref3 = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {},
+var numericMenu = function numericMenu(widgetOptions) {
+  var _ref3 = widgetOptions || {},
       container = _ref3.container,
       attribute = _ref3.attribute,
       items = _ref3.items,
@@ -27084,7 +27259,10 @@ function numericMenu() {
     items: items,
     transformItems: transformItems
   });
-}
+};
+
+var _default = numericMenu;
+exports.default = _default;
 },{"preact":"node_modules/preact/dist/preact.module.js","classnames":"node_modules/classnames/index.js","../../components/RefinementList/RefinementList":"node_modules/instantsearch.js/es/components/RefinementList/RefinementList.js","../../connectors/numeric-menu/connectNumericMenu":"node_modules/instantsearch.js/es/connectors/numeric-menu/connectNumericMenu.js","./defaultTemplates":"node_modules/instantsearch.js/es/widgets/numeric-menu/defaultTemplates.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js","../../lib/suit":"node_modules/instantsearch.js/es/lib/suit.js"}],"node_modules/instantsearch.js/es/components/Pagination/PaginationLink.js":[function(require,module,exports) {
 "use strict";
 
@@ -27094,10 +27272,6 @@ Object.defineProperty(exports, "__esModule", {
 exports.default = void 0;
 
 var _preact = require("preact");
-
-var _propTypes = _interopRequireDefault(require("prop-types"));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 /** @jsx h */
 function PaginationLink(_ref) {
@@ -27137,7 +27311,7 @@ function PaginationLink(_ref) {
 
 var _default = PaginationLink;
 exports.default = _default;
-},{"preact":"node_modules/preact/dist/preact.module.js","prop-types":"node_modules/prop-types/index.js"}],"node_modules/instantsearch.js/es/components/Pagination/Pagination.js":[function(require,module,exports) {
+},{"preact":"node_modules/preact/dist/preact.module.js"}],"node_modules/instantsearch.js/es/components/Pagination/Pagination.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -27146,8 +27320,6 @@ Object.defineProperty(exports, "__esModule", {
 exports.default = void 0;
 
 var _preact = require("preact");
-
-var _propTypes = _interopRequireDefault(require("prop-types"));
 
 var _classnames = _interopRequireDefault(require("classnames"));
 
@@ -27335,7 +27507,7 @@ function (_Component) {
       return this.pageLink({
         ariaLabel: 'Previous',
         additionalClassName: this.props.cssClasses.previousPageItem,
-        isDisabled: this.props.nbHits === 0 || isFirstPage,
+        isDisabled: isFirstPage,
         label: this.props.templates.previous,
         pageNumber: currentPage - 1,
         createURL: createURL
@@ -27350,7 +27522,7 @@ function (_Component) {
       return this.pageLink({
         ariaLabel: 'Next',
         additionalClassName: this.props.cssClasses.nextPageItem,
-        isDisabled: this.props.nbHits === 0 || isLastPage,
+        isDisabled: isLastPage,
         label: this.props.templates.next,
         pageNumber: currentPage + 1,
         createURL: createURL
@@ -27364,7 +27536,7 @@ function (_Component) {
       return this.pageLink({
         ariaLabel: 'First',
         additionalClassName: this.props.cssClasses.firstPageItem,
-        isDisabled: this.props.nbHits === 0 || isFirstPage,
+        isDisabled: isFirstPage,
         label: this.props.templates.first,
         pageNumber: 0,
         createURL: createURL
@@ -27379,7 +27551,7 @@ function (_Component) {
       return this.pageLink({
         ariaLabel: 'Last',
         additionalClassName: this.props.cssClasses.lastPageItem,
-        isDisabled: this.props.nbHits === 0 || isLastPage,
+        isDisabled: isLastPage,
         label: this.props.templates.last,
         pageNumber: nbPages - 1,
         createURL: createURL
@@ -27425,7 +27597,7 @@ Pagination.defaultProps = {
 };
 var _default = Pagination;
 exports.default = _default;
-},{"preact":"node_modules/preact/dist/preact.module.js","prop-types":"node_modules/prop-types/index.js","classnames":"node_modules/classnames/index.js","./PaginationLink":"node_modules/instantsearch.js/es/components/Pagination/PaginationLink.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js"}],"node_modules/instantsearch.js/es/connectors/pagination/Paginator.js":[function(require,module,exports) {
+},{"preact":"node_modules/preact/dist/preact.module.js","classnames":"node_modules/classnames/index.js","./PaginationLink":"node_modules/instantsearch.js/es/components/Pagination/PaginationLink.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js"}],"node_modules/instantsearch.js/es/connectors/pagination/Paginator.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -27457,11 +27629,32 @@ function _createClass(Constructor, protoProps, staticProps) {
   return Constructor;
 }
 
+function _defineProperty(obj, key, value) {
+  if (key in obj) {
+    Object.defineProperty(obj, key, {
+      value: value,
+      enumerable: true,
+      configurable: true,
+      writable: true
+    });
+  } else {
+    obj[key] = value;
+  }
+
+  return obj;
+}
+
 var Paginator =
 /*#__PURE__*/
 function () {
   function Paginator(params) {
     _classCallCheck(this, Paginator);
+
+    _defineProperty(this, "currentPage", void 0);
+
+    _defineProperty(this, "total", void 0);
+
+    _defineProperty(this, "padding", void 0);
 
     this.currentPage = params.currentPage;
     this.total = params.total;
@@ -27513,7 +27706,7 @@ function () {
   }, {
     key: "isLastPage",
     value: function isLastPage() {
-      return this.currentPage === this.total - 1;
+      return this.currentPage === this.total - 1 || this.total === 0;
     }
   }, {
     key: "isFirstPage",
@@ -27533,7 +27726,7 @@ exports.default = _default;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.default = connectPagination;
+exports.default = void 0;
 
 var _utils = require("../../lib/utils");
 
@@ -27560,13 +27753,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -27595,157 +27788,55 @@ var withUsage = (0, _utils.createDocumentationMessageGenerator)({
   connector: true
 });
 /**
- * @typedef {Object} CustomPaginationWidgetOptions
- * @property {number} [totalPages] The total number of pages to browse.
- * @property {number} [padding = 3] The padding of pages to show around the current page
- */
-
-/**
- * @typedef {Object} PaginationRenderingOptions
- * @property {function(page): string} createURL Creates URLs for the next state, the number is the page to generate the URL for.
- * @property {number} currentRefinement The number of the page currently displayed.
- * @property {number} nbHits The number of hits computed for the last query (can be approximated).
- * @property {number} nbPages The number of pages for the result set.
- * @property {number[]} pages The actual pages relevant to the current situation and padding
- * @property {boolean} isFirstPage true if the current page is also the first page
- * @property {boolean} isLastPage true if the current page is also the last page
- * @property {function(page)} refine Sets the current page and trigger a search.
- * @property {Object} widgetParams All original `CustomPaginationWidgetOptions` forwarded to the `renderFn`.
- */
-
-/**
  * **Pagination** connector provides the logic to build a widget that will let the user
  * choose the current page of the results.
  *
  * When using the pagination with Algolia, you should be aware that the engine won't provide you pages
  * beyond the 1000th hits by default. You can find more information on the [Algolia documentation](https://www.algolia.com/doc/guides/searching/pagination/#pagination-limitations).
- *
- * @type {Connector}
- * @param {function(PaginationRenderingOptions, boolean)} renderFn Rendering function for the custom **Pagination** widget.
- * @param {function} unmountFn Unmount function called when the widget is disposed.
- * @return {function(CustomPaginationWidgetOptions)} Re-usable widget factory for a custom **Pagination** widget.
- * @example
- * // custom `renderFn` to render the custom Pagination widget
- * function renderFn(PaginationRenderingOptions, isFirstRendering) {
- *   if (isFirstRendering) {
- *     PaginationRenderingOptions.widgetParams.containerNode.html('<ul></ul>');
- *   }
- *
- *   // remove event listeners before replacing markup
- *   PaginationRenderingOptions.widgetParams.containerNode
- *     .find('a[data-page]')
- *     .each(function() { $(this).off('click'); });
- *
- *   var pages = PaginationRenderingOptions.pages
- *     .map(function(page) {
- *       return '<li style="display: inline-block; margin-right: 10px;">' +
- *         '<a href="' + PaginationRenderingOptions.createURL(page) + '" data-page="' + page + '">' +
- *         (parseInt(page) + 1) + '</a></li>';
- *     });
- *
- *   PaginationRenderingOptions.widgetParams.containerNode
- *     .find('ul')
- *     .html(pages);
- *
- *   PaginationRenderingOptions.widgetParams.containerNode
- *     .find('a[data-page]')
- *     .each(function() {
- *       $(this).on('click', function(event) {
- *         event.preventDefault();
- *         PaginationRenderingOptions.refine($(this).data('page'));
- *       });
- *     });
- * }
- *
- * // connect `renderFn` to Pagination logic
- * var customPagination = instantsearch.connectors.connectPagination(renderFn);
- *
- * // mount widget on the page
- * search.addWidgets([
- *   customPagination({
- *     containerNode: $('#custom-pagination-container'),
- *     totalPages: 20,
- *     padding: 4,
- *   })
- * ]);
  */
 
-function connectPagination(renderFn) {
+var connectPagination = function connectPagination(renderFn) {
   var unmountFn = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : _utils.noop;
   (0, _utils.checkRendering)(renderFn, withUsage());
-  return function () {
-    var widgetParams = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-    var totalPages = widgetParams.totalPages,
-        _widgetParams$padding = widgetParams.padding,
-        padding = _widgetParams$padding === void 0 ? 3 : _widgetParams$padding;
+  return function (widgetParams) {
+    var _ref = widgetParams || {},
+        totalPages = _ref.totalPages,
+        _ref$padding = _ref.padding,
+        padding = _ref$padding === void 0 ? 3 : _ref$padding;
+
     var pager = new _Paginator.default({
       currentPage: 0,
       total: 0,
       padding: padding
     });
+    var connectorState = {};
+
+    function getMaxPage(_ref2) {
+      var nbPages = _ref2.nbPages;
+      return totalPages !== undefined ? Math.min(totalPages, nbPages) : nbPages;
+    }
+
     return {
       $$type: 'ais.pagination',
-      init: function init(_ref) {
-        var helper = _ref.helper,
-            createURL = _ref.createURL,
-            instantSearchInstance = _ref.instantSearchInstance;
-
-        this.refine = function (page) {
-          helper.setPage(page);
-          helper.search();
-        };
-
-        this.createURL = function (state) {
-          return function (page) {
-            return createURL(state.setPage(page));
-          };
-        };
-
-        renderFn({
-          createURL: this.createURL(helper.state),
-          currentRefinement: helper.state.page || 0,
-          nbHits: 0,
-          nbPages: 0,
-          pages: [],
-          isFirstPage: true,
-          isLastPage: true,
-          refine: this.refine,
-          widgetParams: widgetParams,
+      init: function init(initOptions) {
+        var instantSearchInstance = initOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(initOptions), {
           instantSearchInstance: instantSearchInstance
-        }, true);
+        }), true);
       },
-      getMaxPage: function getMaxPage(_ref2) {
-        var nbPages = _ref2.nbPages;
-        return totalPages !== undefined ? Math.min(totalPages, nbPages) : nbPages;
-      },
-      render: function render(_ref3) {
-        var results = _ref3.results,
-            state = _ref3.state,
-            instantSearchInstance = _ref3.instantSearchInstance;
-        var page = state.page || 0;
-        var nbPages = this.getMaxPage(results);
-        pager.currentPage = page;
-        pager.total = nbPages;
-        renderFn({
-          createURL: this.createURL(state),
-          currentRefinement: page,
-          refine: this.refine,
-          nbHits: results.nbHits,
-          nbPages: nbPages,
-          pages: pager.pages(),
-          isFirstPage: pager.isFirstPage(),
-          isLastPage: pager.isLastPage(),
-          widgetParams: widgetParams,
+      render: function render(renderOptions) {
+        var instantSearchInstance = renderOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(renderOptions), {
           instantSearchInstance: instantSearchInstance
-        }, false);
+        }), false);
       },
-      dispose: function dispose(_ref4) {
-        var state = _ref4.state;
+      dispose: function dispose(_ref3) {
+        var state = _ref3.state;
         unmountFn();
         return state.setQueryParameter('page', undefined);
       },
-      getWidgetState: function getWidgetState(uiState, _ref5) {
-        var searchParameters = _ref5.searchParameters;
+      getWidgetUiState: function getWidgetUiState(uiState, _ref4) {
+        var searchParameters = _ref4.searchParameters;
         var page = searchParameters.page || 0;
 
         if (!page) {
@@ -27756,14 +27847,61 @@ function connectPagination(renderFn) {
           page: page + 1
         });
       },
-      getWidgetSearchParameters: function getWidgetSearchParameters(searchParameters, _ref6) {
-        var uiState = _ref6.uiState;
+      getWidgetSearchParameters: function getWidgetSearchParameters(searchParameters, _ref5) {
+        var uiState = _ref5.uiState;
         var page = uiState.page ? uiState.page - 1 : 0;
         return searchParameters.setQueryParameter('page', page);
+      },
+      getWidgetRenderState: function getWidgetRenderState(_ref6) {
+        var results = _ref6.results,
+            helper = _ref6.helper,
+            createURL = _ref6.createURL;
+
+        if (!connectorState.refine) {
+          connectorState.refine = function (page) {
+            helper.setPage(page);
+            helper.search();
+          };
+        }
+
+        if (!connectorState.createURL) {
+          connectorState.createURL = function (state) {
+            return function (page) {
+              return createURL(state.setPage(page));
+            };
+          };
+        }
+
+        var state = helper.state;
+        var page = state.page || 0;
+        var nbPages = getMaxPage(results || {
+          nbPages: 0
+        });
+        pager.currentPage = page;
+        pager.total = nbPages;
+        return {
+          createURL: connectorState.createURL(state),
+          refine: connectorState.refine,
+          currentRefinement: page,
+          nbHits: (results === null || results === void 0 ? void 0 : results.nbHits) || 0,
+          nbPages: nbPages,
+          pages: results ? pager.pages() : [],
+          isFirstPage: pager.isFirstPage(),
+          isLastPage: pager.isLastPage(),
+          widgetParams: widgetParams
+        };
+      },
+      getRenderState: function getRenderState(renderState, renderOptions) {
+        return _objectSpread({}, renderState, {
+          pagination: this.getWidgetRenderState(renderOptions)
+        });
       }
     };
   };
-}
+};
+
+var _default = connectPagination;
+exports.default = _default;
 },{"../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js","./Paginator":"node_modules/instantsearch.js/es/connectors/pagination/Paginator.js"}],"node_modules/instantsearch.js/es/widgets/pagination/pagination.js":[function(require,module,exports) {
 "use strict";
 
@@ -27805,13 +27943,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -28066,8 +28204,6 @@ exports.default = void 0;
 
 var _preact = require("preact");
 
-var _propTypes = _interopRequireDefault(require("prop-types"));
-
 var _classnames = _interopRequireDefault(require("classnames"));
 
 var _Template = _interopRequireDefault(require("../Template/Template"));
@@ -28206,14 +28342,14 @@ function (_Component) {
 
     _defineProperty(_assertThisInitialized(_this), "onInput", function (name) {
       return function (event) {
-        _this.setState(_defineProperty({}, name, Number(event.currentTarget.value)));
+        _this.setState(_defineProperty({}, name, event.currentTarget.value));
       };
     });
 
     _defineProperty(_assertThisInitialized(_this), "onSubmit", function (event) {
       event.preventDefault();
 
-      _this.props.refine([_this.state.min, _this.state.max]);
+      _this.props.refine([_this.state.min && Number(_this.state.min), _this.state.max && Number(_this.state.max)]);
     });
 
     _this.state = {
@@ -28259,7 +28395,7 @@ function (_Component) {
         min: min,
         max: max,
         step: step,
-        value: minValue,
+        value: minValue !== null && minValue !== void 0 ? minValue : '',
         onInput: this.onInput('min'),
         placeholder: min,
         disabled: isDisabled
@@ -28277,7 +28413,7 @@ function (_Component) {
         min: min,
         max: max,
         step: step,
-        value: maxValue,
+        value: maxValue !== null && maxValue !== void 0 ? maxValue : '',
         onInput: this.onInput('max'),
         placeholder: max,
         disabled: isDisabled
@@ -28298,7 +28434,7 @@ function (_Component) {
 
 var _default = RangeInput;
 exports.default = _default;
-},{"preact":"node_modules/preact/dist/preact.module.js","prop-types":"node_modules/prop-types/index.js","classnames":"node_modules/classnames/index.js","../Template/Template":"node_modules/instantsearch.js/es/components/Template/Template.js"}],"node_modules/instantsearch.js/es/connectors/range/connectRange.js":[function(require,module,exports) {
+},{"preact":"node_modules/preact/dist/preact.module.js","classnames":"node_modules/classnames/index.js","../Template/Template":"node_modules/instantsearch.js/es/components/Template/Template.js"}],"node_modules/instantsearch.js/es/connectors/range/connectRange.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -28327,13 +28463,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -28406,6 +28542,7 @@ var withUsage = (0, _utils.createDocumentationMessageGenerator)({
   name: 'range-slider',
   connector: true
 });
+var $$type = 'ais.range';
 /**
  * @typedef {Object} CustomRangeWidgetOptions
  * @property {string} attribute Name of the attribute for faceting.
@@ -28470,9 +28607,123 @@ function connectRange(renderFn) {
       to: function to(v) {
         return formatToNumber(v).toLocaleString();
       }
+    }; // eslint-disable-next-line complexity
+
+    var getRefinedState = function getRefinedState(helper, currentRange, nextMin, nextMax) {
+      var resolvedState = helper.state;
+      var currentRangeMin = currentRange.min,
+          currentRangeMax = currentRange.max;
+
+      var _ref = resolvedState.getNumericRefinement(attribute, '>=') || [],
+          _ref2 = _slicedToArray(_ref, 1),
+          min = _ref2[0];
+
+      var _ref3 = resolvedState.getNumericRefinement(attribute, '<=') || [],
+          _ref4 = _slicedToArray(_ref3, 1),
+          max = _ref4[0];
+
+      var isResetMin = nextMin === undefined || nextMin === '';
+      var isResetMax = nextMax === undefined || nextMax === '';
+      var nextMinAsNumber = !isResetMin ? parseFloat(nextMin) : undefined;
+      var nextMaxAsNumber = !isResetMax ? parseFloat(nextMax) : undefined;
+      var newNextMin;
+
+      if (!hasMinBound && currentRangeMin === nextMinAsNumber) {
+        newNextMin = undefined;
+      } else if (hasMinBound && isResetMin) {
+        newNextMin = minBound;
+      } else {
+        newNextMin = nextMinAsNumber;
+      }
+
+      var newNextMax;
+
+      if (!hasMaxBound && currentRangeMax === nextMaxAsNumber) {
+        newNextMax = undefined;
+      } else if (hasMaxBound && isResetMax) {
+        newNextMax = maxBound;
+      } else {
+        newNextMax = nextMaxAsNumber;
+      }
+
+      var isResetNewNextMin = newNextMin === undefined;
+      var isValidNewNextMin = (0, _utils.isFiniteNumber)(newNextMin);
+      var isValidMinCurrentRange = (0, _utils.isFiniteNumber)(currentRangeMin);
+      var isGreaterThanCurrentRange = isValidMinCurrentRange && currentRangeMin <= newNextMin;
+      var isMinValid = isResetNewNextMin || isValidNewNextMin && (!isValidMinCurrentRange || isGreaterThanCurrentRange);
+      var isResetNewNextMax = newNextMax === undefined;
+      var isValidNewNextMax = (0, _utils.isFiniteNumber)(newNextMax);
+      var isValidMaxCurrentRange = (0, _utils.isFiniteNumber)(currentRangeMax);
+      var isLowerThanRange = isValidMaxCurrentRange && currentRangeMax >= newNextMax;
+      var isMaxValid = isResetNewNextMax || isValidNewNextMax && (!isValidMaxCurrentRange || isLowerThanRange);
+      var hasMinChange = min !== newNextMin;
+      var hasMaxChange = max !== newNextMax;
+
+      if ((hasMinChange || hasMaxChange) && isMinValid && isMaxValid) {
+        resolvedState = resolvedState.removeNumericRefinement(attribute);
+
+        if (isValidNewNextMin) {
+          resolvedState = resolvedState.addNumericRefinement(attribute, '>=', formatToNumber(newNextMin));
+        }
+
+        if (isValidNewNextMax) {
+          resolvedState = resolvedState.addNumericRefinement(attribute, '<=', formatToNumber(newNextMax));
+        }
+
+        return resolvedState;
+      }
+
+      return null;
     };
+
+    var sendEventWithRefinedState = function sendEventWithRefinedState(refinedState, instantSearchInstance, helper) {
+      var eventName = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : 'Filter Applied';
+      var filters = (0, _utils.convertNumericRefinementsToFilters)(refinedState, attribute);
+
+      if (filters && filters.length > 0) {
+        instantSearchInstance.sendEventToInsights({
+          insightsMethod: 'clickedFilters',
+          widgetType: $$type,
+          eventType: 'click',
+          payload: {
+            eventName: eventName,
+            index: helper.getIndex(),
+            filters: filters
+          }
+        });
+      }
+    };
+
+    var createSendEvent = function createSendEvent(instantSearchInstance, helper, currentRange) {
+      return function () {
+        for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
+          args[_key] = arguments[_key];
+        }
+
+        if (args.length === 1) {
+          instantSearchInstance.sendEventToInsights(args[0]);
+          return;
+        }
+
+        var eventType = args[0],
+            facetValue = args[1],
+            eventName = args[2];
+
+        if (eventType !== 'click') {
+          return;
+        }
+
+        var _facetValue = _slicedToArray(facetValue, 2),
+            nextMin = _facetValue[0],
+            nextMax = _facetValue[1];
+
+        var refinedState = getRefinedState(helper, currentRange, nextMin, nextMax);
+        sendEventWithRefinedState(refinedState, instantSearchInstance, helper, eventName);
+      };
+    };
+
     return {
-      $$type: 'ais.range',
+      $$type: $$type,
       _getCurrentRange: function _getCurrentRange(stats) {
         var pow = Math.pow(10, precision);
         var min;
@@ -28501,117 +28752,54 @@ function connectRange(renderFn) {
         };
       },
       _getCurrentRefinement: function _getCurrentRefinement(helper) {
-        var _ref = helper.getNumericRefinement(attribute, '>=') || [],
-            _ref2 = _slicedToArray(_ref, 1),
-            minValue = _ref2[0];
+        var _ref5 = helper.getNumericRefinement(attribute, '>=') || [],
+            _ref6 = _slicedToArray(_ref5, 1),
+            minValue = _ref6[0];
 
-        var _ref3 = helper.getNumericRefinement(attribute, '<=') || [],
-            _ref4 = _slicedToArray(_ref3, 1),
-            maxValue = _ref4[0];
+        var _ref7 = helper.getNumericRefinement(attribute, '<=') || [],
+            _ref8 = _slicedToArray(_ref7, 1),
+            maxValue = _ref8[0];
 
         var min = (0, _utils.isFiniteNumber)(minValue) ? minValue : -Infinity;
         var max = (0, _utils.isFiniteNumber)(maxValue) ? maxValue : Infinity;
         return [min, max];
       },
-      _refine: function _refine(helper, currentRange) {
+      _refine: function _refine(instantSearchInstance, helper, currentRange) {
         // eslint-disable-next-line complexity
         return function () {
-          var _ref5 = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [],
-              _ref6 = _slicedToArray(_ref5, 2),
-              nextMin = _ref6[0],
-              nextMax = _ref6[1];
+          var _ref9 = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [],
+              _ref10 = _slicedToArray(_ref9, 2),
+              nextMin = _ref10[0],
+              nextMax = _ref10[1];
 
-          var currentRangeMin = currentRange.min,
-              currentRangeMax = currentRange.max;
+          var refinedState = getRefinedState(helper, currentRange, nextMin, nextMax);
 
-          var _ref7 = helper.getNumericRefinement(attribute, '>=') || [],
-              _ref8 = _slicedToArray(_ref7, 1),
-              min = _ref8[0];
-
-          var _ref9 = helper.getNumericRefinement(attribute, '<=') || [],
-              _ref10 = _slicedToArray(_ref9, 1),
-              max = _ref10[0];
-
-          var isResetMin = nextMin === undefined || nextMin === '';
-          var isResetMax = nextMax === undefined || nextMax === '';
-          var nextMinAsNumber = !isResetMin ? parseFloat(nextMin) : undefined;
-          var nextMaxAsNumber = !isResetMax ? parseFloat(nextMax) : undefined;
-          var newNextMin;
-
-          if (!hasMinBound && currentRangeMin === nextMinAsNumber) {
-            newNextMin = undefined;
-          } else if (hasMinBound && isResetMin) {
-            newNextMin = minBound;
-          } else {
-            newNextMin = nextMinAsNumber;
-          }
-
-          var newNextMax;
-
-          if (!hasMaxBound && currentRangeMax === nextMaxAsNumber) {
-            newNextMax = undefined;
-          } else if (hasMaxBound && isResetMax) {
-            newNextMax = maxBound;
-          } else {
-            newNextMax = nextMaxAsNumber;
-          }
-
-          var isResetNewNextMin = newNextMin === undefined;
-          var isValidNewNextMin = (0, _utils.isFiniteNumber)(newNextMin);
-          var isValidMinCurrentRange = (0, _utils.isFiniteNumber)(currentRangeMin);
-          var isGreaterThanCurrentRange = isValidMinCurrentRange && currentRangeMin <= newNextMin;
-          var isMinValid = isResetNewNextMin || isValidNewNextMin && (!isValidMinCurrentRange || isGreaterThanCurrentRange);
-          var isResetNewNextMax = newNextMax === undefined;
-          var isValidNewNextMax = (0, _utils.isFiniteNumber)(newNextMax);
-          var isValidMaxCurrentRange = (0, _utils.isFiniteNumber)(currentRangeMax);
-          var isLowerThanRange = isValidMaxCurrentRange && currentRangeMax >= newNextMax;
-          var isMaxValid = isResetNewNextMax || isValidNewNextMax && (!isValidMaxCurrentRange || isLowerThanRange);
-          var hasMinChange = min !== newNextMin;
-          var hasMaxChange = max !== newNextMax;
-
-          if ((hasMinChange || hasMaxChange) && isMinValid && isMaxValid) {
-            helper.removeNumericRefinement(attribute);
-
-            if (isValidNewNextMin) {
-              helper.addNumericRefinement(attribute, '>=', formatToNumber(newNextMin));
-            }
-
-            if (isValidNewNextMax) {
-              helper.addNumericRefinement(attribute, '<=', formatToNumber(newNextMax));
-            }
-
-            helper.search();
+          if (refinedState) {
+            sendEventWithRefinedState(refinedState, instantSearchInstance, helper);
+            helper.setState(refinedState).search();
           }
         };
       },
-      init: function init(_ref11) {
-        var helper = _ref11.helper,
-            instantSearchInstance = _ref11.instantSearchInstance;
-        var stats = {};
-
-        var currentRange = this._getCurrentRange(stats);
-
-        var start = this._getCurrentRefinement(helper);
-
-        renderFn({
-          // On first render pass an empty range
-          // to be able to bypass the validation
-          // related to it
-          refine: this._refine(helper, {}),
-          format: rangeFormatter,
-          range: currentRange,
-          widgetParams: _objectSpread({}, widgetParams, {
-            precision: precision
-          }),
-          start: start,
-          instantSearchInstance: instantSearchInstance
-        }, true);
+      init: function init(initOptions) {
+        renderFn(_objectSpread({}, this.getWidgetRenderState(initOptions), {
+          instantSearchInstance: initOptions.instantSearchInstance
+        }), true);
       },
-      render: function render(_ref12) {
-        var results = _ref12.results,
-            helper = _ref12.helper,
-            instantSearchInstance = _ref12.instantSearchInstance;
-        var facetsFromResults = results.disjunctiveFacets || [];
+      render: function render(renderOptions) {
+        renderFn(_objectSpread({}, this.getWidgetRenderState(renderOptions), {
+          instantSearchInstance: renderOptions.instantSearchInstance
+        }), false);
+      },
+      getRenderState: function getRenderState(renderState, renderOptions) {
+        return _objectSpread({}, renderState, {
+          range: _objectSpread({}, renderState.range, _defineProperty({}, attribute, this.getWidgetRenderState(renderOptions)))
+        });
+      },
+      getWidgetRenderState: function getWidgetRenderState(_ref11) {
+        var results = _ref11.results,
+            helper = _ref11.helper,
+            instantSearchInstance = _ref11.instantSearchInstance;
+        var facetsFromResults = results && results.disjunctiveFacets || [];
         var facet = (0, _utils.find)(facetsFromResults, function (facetResult) {
           return facetResult.name === attribute;
         });
@@ -28621,19 +28809,30 @@ function connectRange(renderFn) {
 
         var start = this._getCurrentRefinement(helper);
 
-        renderFn({
-          refine: this._refine(helper, currentRange),
+        var refine;
+
+        if (!results) {
+          // On first render pass an empty range
+          // to be able to bypass the validation
+          // related to it
+          refine = this._refine(instantSearchInstance, helper, {});
+        } else {
+          refine = this._refine(instantSearchInstance, helper, currentRange);
+        }
+
+        return {
+          refine: refine,
           format: rangeFormatter,
           range: currentRange,
+          sendEvent: createSendEvent(instantSearchInstance, helper, currentRange),
           widgetParams: _objectSpread({}, widgetParams, {
             precision: precision
           }),
-          start: start,
-          instantSearchInstance: instantSearchInstance
-        }, false);
+          start: start
+        };
       },
-      dispose: function dispose(_ref13) {
-        var state = _ref13.state;
+      dispose: function dispose(_ref12) {
+        var state = _ref12.state;
         unmountFn();
         var stateWithoutDisjunctive = state.removeDisjunctiveFacet(attribute); // can not use setQueryParameters || removeNumericRefinement, because
         // they both keep the old value. This isn't immutable, but it is fine
@@ -28642,8 +28841,8 @@ function connectRange(renderFn) {
         stateWithoutDisjunctive.numericRefinements = _objectSpread({}, state.numericRefinements, _defineProperty({}, attribute, undefined));
         return stateWithoutDisjunctive;
       },
-      getWidgetState: function getWidgetState(uiState, _ref14) {
-        var searchParameters = _ref14.searchParameters;
+      getWidgetUiState: function getWidgetUiState(uiState, _ref13) {
+        var searchParameters = _ref13.searchParameters;
 
         var _searchParameters$get = searchParameters.getNumericRefinements(attribute),
             _searchParameters$get2 = _searchParameters$get['>='],
@@ -28659,8 +28858,8 @@ function connectRange(renderFn) {
           range: _objectSpread({}, uiState.range, _defineProperty({}, attribute, "".concat(min, ":").concat(max)))
         });
       },
-      getWidgetSearchParameters: function getWidgetSearchParameters(searchParameters, _ref15) {
-        var uiState = _ref15.uiState;
+      getWidgetSearchParameters: function getWidgetSearchParameters(searchParameters, _ref14) {
+        var uiState = _ref14.uiState;
         var widgetSearchParameters = searchParameters.addDisjunctiveFacet(attribute).setQueryParameters({
           numericRefinements: _objectSpread({}, searchParameters.numericRefinements, _defineProperty({}, attribute, {}))
         });
@@ -28738,13 +28937,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -28980,11 +29179,13 @@ function rangeInput() {
   var makeWidget = (0, _connectRange.default)(specializedRenderer, function () {
     return (0, _preact.render)(null, containerNode);
   });
-  return makeWidget({
+  return _objectSpread({}, makeWidget({
     attribute: attribute,
     min: min,
     max: max,
     precision: precision
+  }), {
+    $$type: 'ais.rangeInput'
   });
 }
 },{"preact":"node_modules/preact/dist/preact.module.js","classnames":"node_modules/classnames/index.js","../../components/RangeInput/RangeInput":"node_modules/instantsearch.js/es/components/RangeInput/RangeInput.js","../../connectors/range/connectRange":"node_modules/instantsearch.js/es/connectors/range/connectRange.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js","../../lib/suit":"node_modules/instantsearch.js/es/lib/suit.js"}],"node_modules/instantsearch.js/es/connectors/search-box/connectSearchBox.js":[function(require,module,exports) {
@@ -29016,13 +29217,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -29115,67 +29316,72 @@ function connectSearchBox(renderFn) {
 
     function clear(helper) {
       return function () {
-        helper.setQuery('');
-        helper.search();
+        helper.setQuery('').search();
       };
+    }
+
+    var _clear = function _clear() {};
+
+    function _cachedClear() {
+      _clear();
     }
 
     return {
       $$type: 'ais.searchBox',
-      _clear: function _clear() {},
-      _cachedClear: function _cachedClear() {
-        this._clear();
-      },
-      init: function init(_ref) {
-        var helper = _ref.helper,
-            instantSearchInstance = _ref.instantSearchInstance;
-        this._cachedClear = this._cachedClear.bind(this);
-        this._clear = clear(helper);
-
-        var setQueryAndSearch = function setQueryAndSearch(query) {
-          if (query !== helper.state.query) {
-            helper.setQuery(query).search();
-          }
-        };
-
-        this._refine = function (query) {
-          if (queryHook) {
-            queryHook(query, setQueryAndSearch);
-            return;
-          }
-
-          setQueryAndSearch(query);
-        };
-
-        renderFn({
-          query: helper.state.query || '',
-          refine: this._refine,
-          clear: this._cachedClear,
-          widgetParams: widgetParams,
+      init: function init(initOptions) {
+        var instantSearchInstance = initOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(initOptions), {
           instantSearchInstance: instantSearchInstance
-        }, true);
+        }), true);
       },
-      render: function render(_ref2) {
-        var helper = _ref2.helper,
-            instantSearchInstance = _ref2.instantSearchInstance,
-            searchMetadata = _ref2.searchMetadata;
-        this._clear = clear(helper);
-        renderFn({
-          query: helper.state.query || '',
-          refine: this._refine,
-          clear: this._cachedClear,
-          widgetParams: widgetParams,
-          instantSearchInstance: instantSearchInstance,
-          isSearchStalled: searchMetadata.isSearchStalled
-        }, false);
+      render: function render(renderOptions) {
+        var instantSearchInstance = renderOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(renderOptions), {
+          instantSearchInstance: instantSearchInstance
+        }), false);
       },
-      dispose: function dispose(_ref3) {
-        var state = _ref3.state;
+      dispose: function dispose(_ref) {
+        var state = _ref.state;
         unmountFn();
         return state.setQueryParameter('query', undefined);
       },
-      getWidgetState: function getWidgetState(uiState, _ref4) {
-        var searchParameters = _ref4.searchParameters;
+      getRenderState: function getRenderState(renderState, renderOptions) {
+        return _objectSpread({}, renderState, {
+          searchBox: this.getWidgetRenderState(renderOptions)
+        });
+      },
+      getWidgetRenderState: function getWidgetRenderState(_ref2) {
+        var helper = _ref2.helper,
+            searchMetadata = _ref2.searchMetadata;
+
+        if (!this._refine) {
+          var setQueryAndSearch = function setQueryAndSearch(query) {
+            if (query !== helper.state.query) {
+              helper.setQuery(query).search();
+            }
+          };
+
+          this._refine = function (query) {
+            if (queryHook) {
+              queryHook(query, setQueryAndSearch);
+              return;
+            }
+
+            setQueryAndSearch(query);
+          };
+        }
+
+        _clear = clear(helper);
+        return {
+          query: helper.state.query || '',
+          refine: this._refine,
+          clear: _cachedClear,
+          widgetParams: widgetParams,
+          isSearchStalled: searchMetadata.isSearchStalled
+        };
+      },
+      getWidgetUiState: function getWidgetUiState(uiState, _ref3) {
+        var searchParameters = _ref3.searchParameters;
         var query = searchParameters.query || '';
 
         if (query === '' || uiState && uiState.query === query) {
@@ -29186,29 +29392,14 @@ function connectSearchBox(renderFn) {
           query: query
         });
       },
-      getWidgetSearchParameters: function getWidgetSearchParameters(searchParameters, _ref5) {
-        var uiState = _ref5.uiState;
+      getWidgetSearchParameters: function getWidgetSearchParameters(searchParameters, _ref4) {
+        var uiState = _ref4.uiState;
         return searchParameters.setQueryParameter('query', uiState.query || '');
       }
     };
   };
 }
-},{"../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js"}],"node_modules/instantsearch.js/es/widgets/search-box/defaultTemplates.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.default = void 0;
-
-/* eslint max-len: 0 */
-var _default = {
-  reset: "\n<svg class=\"{{cssClasses.resetIcon}}\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 20 20\" width=\"10\" height=\"10\">\n  <path d=\"M8.114 10L.944 2.83 0 1.885 1.886 0l.943.943L10 8.113l7.17-7.17.944-.943L20 1.886l-.943.943-7.17 7.17 7.17 7.17.943.944L18.114 20l-.943-.943-7.17-7.17-7.17 7.17-.944.943L0 18.114l.943-.943L8.113 10z\"></path>\n</svg>\n  ",
-  submit: "\n<svg class=\"{{cssClasses.submitIcon}}\" xmlns=\"http://www.w3.org/2000/svg\" width=\"10\" height=\"10\" viewBox=\"0 0 40 40\">\n  <path d=\"M26.804 29.01c-2.832 2.34-6.465 3.746-10.426 3.746C7.333 32.756 0 25.424 0 16.378 0 7.333 7.333 0 16.378 0c9.046 0 16.378 7.333 16.378 16.378 0 3.96-1.406 7.594-3.746 10.426l10.534 10.534c.607.607.61 1.59-.004 2.202-.61.61-1.597.61-2.202.004L26.804 29.01zm-10.426.627c7.323 0 13.26-5.936 13.26-13.26 0-7.32-5.937-13.257-13.26-13.257C9.056 3.12 3.12 9.056 3.12 16.378c0 7.323 5.936 13.26 13.258 13.26z\"></path>\n</svg>\n  ",
-  loadingIndicator: "\n<svg class=\"{{cssClasses.loadingIcon}}\" width=\"16\" height=\"16\" viewBox=\"0 0 38 38\" xmlns=\"http://www.w3.org/2000/svg\" stroke=\"#444\">\n  <g fill=\"none\" fillRule=\"evenodd\">\n    <g transform=\"translate(1 1)\" strokeWidth=\"2\">\n      <circle strokeOpacity=\".5\" cx=\"18\" cy=\"18\" r=\"18\" />\n      <path d=\"M36 18c0-9.94-8.06-18-18-18\">\n        <animateTransform\n          attributeName=\"transform\"\n          type=\"rotate\"\n          from=\"0 18 18\"\n          to=\"360 18 18\"\n          dur=\"1s\"\n          repeatCount=\"indefinite\"\n        />\n      </path>\n    </g>\n  </g>\n</svg>\n  "
-};
-exports.default = _default;
-},{}],"node_modules/instantsearch.js/es/widgets/search-box/search-box.js":[function(require,module,exports) {
+},{"../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js"}],"node_modules/instantsearch.js/es/widgets/search-box/search-box.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -29251,13 +29442,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -29456,10 +29647,6 @@ Object.defineProperty(exports, "__esModule", {
 exports.default = void 0;
 
 var _preact = require("preact");
-
-var _propTypes = _interopRequireDefault(require("prop-types"));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function _defineProperty(obj, key, value) {
   if (key in obj) {
@@ -30281,7 +30468,7 @@ _defineProperty(Rheostat, "defaultProps", {
 
 var _default = Rheostat;
 exports.default = _default;
-},{"preact":"node_modules/preact/dist/preact.module.js","prop-types":"node_modules/prop-types/index.js"}],"node_modules/instantsearch.js/es/components/Slider/Pit.js":[function(require,module,exports) {
+},{"preact":"node_modules/preact/dist/preact.module.js"}],"node_modules/instantsearch.js/es/components/Slider/Pit.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -30290,8 +30477,6 @@ Object.defineProperty(exports, "__esModule", {
 exports.default = void 0;
 
 var _preact = require("preact");
-
-var _propTypes = _interopRequireDefault(require("prop-types"));
 
 var _classnames = _interopRequireDefault(require("classnames"));
 
@@ -30316,13 +30501,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -30372,7 +30557,7 @@ var Pit = function Pit(_ref) {
 
 var _default = Pit;
 exports.default = _default;
-},{"preact":"node_modules/preact/dist/preact.module.js","prop-types":"node_modules/prop-types/index.js","classnames":"node_modules/classnames/index.js"}],"node_modules/instantsearch.js/es/components/Slider/Slider.js":[function(require,module,exports) {
+},{"preact":"node_modules/preact/dist/preact.module.js","classnames":"node_modules/classnames/index.js"}],"node_modules/instantsearch.js/es/components/Slider/Slider.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -30383,8 +30568,6 @@ exports.default = void 0;
 var _preact = require("preact");
 
 var _Rheostat = _interopRequireDefault(require("./Rheostat"));
-
-var _propTypes = _interopRequireDefault(require("prop-types"));
 
 var _classnames = _interopRequireDefault(require("classnames"));
 
@@ -30664,7 +30847,7 @@ function (_Component) {
 
 var _default = Slider;
 exports.default = _default;
-},{"preact":"node_modules/preact/dist/preact.module.js","./Rheostat":"node_modules/instantsearch.js/es/components/Slider/Rheostat.js","prop-types":"node_modules/prop-types/index.js","classnames":"node_modules/classnames/index.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js","./Pit":"node_modules/instantsearch.js/es/components/Slider/Pit.js"}],"node_modules/instantsearch.js/es/widgets/range-slider/range-slider.js":[function(require,module,exports) {
+},{"preact":"node_modules/preact/dist/preact.module.js","./Rheostat":"node_modules/instantsearch.js/es/components/Slider/Rheostat.js","classnames":"node_modules/classnames/index.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js","./Pit":"node_modules/instantsearch.js/es/components/Slider/Pit.js"}],"node_modules/instantsearch.js/es/widgets/range-slider/range-slider.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -30685,6 +30868,55 @@ var _utils = require("../../lib/utils");
 var _suit = require("../../lib/suit");
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function ownKeys(object, enumerableOnly) {
+  var keys = Object.keys(object);
+
+  if (Object.getOwnPropertySymbols) {
+    var symbols = Object.getOwnPropertySymbols(object);
+    if (enumerableOnly) symbols = symbols.filter(function (sym) {
+      return Object.getOwnPropertyDescriptor(object, sym).enumerable;
+    });
+    keys.push.apply(keys, symbols);
+  }
+
+  return keys;
+}
+
+function _objectSpread(target) {
+  for (var i = 1; i < arguments.length; i++) {
+    var source = arguments[i] != null ? arguments[i] : {};
+
+    if (i % 2) {
+      ownKeys(Object(source), true).forEach(function (key) {
+        _defineProperty(target, key, source[key]);
+      });
+    } else if (Object.getOwnPropertyDescriptors) {
+      Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
+    } else {
+      ownKeys(Object(source)).forEach(function (key) {
+        Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
+      });
+    }
+  }
+
+  return target;
+}
+
+function _defineProperty(obj, key, value) {
+  if (key in obj) {
+    Object.defineProperty(obj, key, {
+      value: value,
+      enumerable: true,
+      configurable: true,
+      writable: true
+    });
+  } else {
+    obj[key] = value;
+  }
+
+  return obj;
+}
 
 function _slicedToArray(arr, i) {
   return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _nonIterableRest();
@@ -30874,11 +31106,13 @@ function rangeSlider() {
   var makeWidget = (0, _connectRange.default)(specializedRenderer, function () {
     return (0, _preact.render)(null, containerNode);
   });
-  return makeWidget({
+  return _objectSpread({}, makeWidget({
     attribute: attribute,
     min: min,
     max: max,
     precision: precision
+  }), {
+    $$type: 'ais.rangeSlider'
   });
 }
 },{"preact":"node_modules/preact/dist/preact.module.js","classnames":"node_modules/classnames/index.js","../../components/Slider/Slider":"node_modules/instantsearch.js/es/components/Slider/Slider.js","../../connectors/range/connectRange":"node_modules/instantsearch.js/es/connectors/range/connectRange.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js","../../lib/suit":"node_modules/instantsearch.js/es/lib/suit.js"}],"node_modules/instantsearch.js/es/connectors/sort-by/connectSortBy.js":[function(require,module,exports) {
@@ -30910,13 +31144,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -31039,50 +31273,59 @@ function connectSortBy(renderFn) {
 
     return {
       $$type: 'ais.sortBy',
-      init: function init(_ref) {
-        var helper = _ref.helper,
-            instantSearchInstance = _ref.instantSearchInstance,
-            parent = _ref.parent;
-        var currentIndex = helper.state.index;
+      init: function init(initOptions) {
+        var instantSearchInstance = initOptions.instantSearchInstance;
+        var widgetRenderState = this.getWidgetRenderState(initOptions);
+        var currentIndex = widgetRenderState.currentRefinement;
         var isCurrentIndexInItems = (0, _utils.find)(items, function (item) {
           return item.value === currentIndex;
         });
-        this.initialIndex = parent.getIndexName();
-
-        this.setIndex = function (indexName) {
-          helper.setIndex(indexName).search();
-        };
-
         "development" === 'development' ? (0, _utils.warning)(isCurrentIndexInItems, "The index named \"".concat(currentIndex, "\" is not listed in the `items` of `sortBy`.")) : void 0;
-        renderFn({
-          currentRefinement: currentIndex,
-          options: transformItems(items),
-          refine: this.setIndex,
-          hasNoResults: true,
-          widgetParams: widgetParams,
+        renderFn(_objectSpread({}, widgetRenderState, {
           instantSearchInstance: instantSearchInstance
-        }, true);
+        }), true);
       },
-      render: function render(_ref2) {
-        var helper = _ref2.helper,
-            results = _ref2.results,
-            instantSearchInstance = _ref2.instantSearchInstance;
-        renderFn({
-          currentRefinement: helper.state.index,
-          options: transformItems(items),
-          refine: this.setIndex,
-          hasNoResults: results.nbHits === 0,
-          widgetParams: widgetParams,
+      render: function render(renderOptions) {
+        var instantSearchInstance = renderOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(renderOptions), {
           instantSearchInstance: instantSearchInstance
-        }, false);
+        }), false);
       },
-      dispose: function dispose(_ref3) {
-        var state = _ref3.state;
+      dispose: function dispose(_ref) {
+        var state = _ref.state;
         unmountFn();
         return state.setIndex(this.initialIndex);
       },
-      getWidgetState: function getWidgetState(uiState, _ref4) {
-        var searchParameters = _ref4.searchParameters;
+      getRenderState: function getRenderState(renderState, renderOptions) {
+        return _objectSpread({}, renderState, {
+          sortBy: this.getWidgetRenderState(renderOptions)
+        });
+      },
+      getWidgetRenderState: function getWidgetRenderState(_ref2) {
+        var results = _ref2.results,
+            helper = _ref2.helper,
+            parent = _ref2.parent;
+
+        if (!this.initialIndex) {
+          this.initialIndex = parent.getIndexName();
+        }
+
+        if (!this.setIndex) {
+          this.setIndex = function (indexName) {
+            helper.setIndex(indexName).search();
+          };
+        }
+
+        return {
+          currentRefinement: helper.state.index,
+          options: transformItems(items),
+          refine: this.setIndex,
+          hasNoResults: results ? results.nbHits === 0 : true,
+          widgetParams: widgetParams
+        };
+      },
+      getWidgetUiState: function getWidgetUiState(uiState, _ref3) {
+        var searchParameters = _ref3.searchParameters;
         var currentIndex = searchParameters.index;
         var isInitialIndex = currentIndex === this.initialIndex;
 
@@ -31094,8 +31337,8 @@ function connectSortBy(renderFn) {
           sortBy: currentIndex
         });
       },
-      getWidgetSearchParameters: function getWidgetSearchParameters(searchParameters, _ref5) {
-        var uiState = _ref5.uiState;
+      getWidgetSearchParameters: function getWidgetSearchParameters(searchParameters, _ref4) {
+        var uiState = _ref4.uiState;
         return searchParameters.setQueryParameter('index', uiState.sortBy || this.initialIndex || searchParameters.index);
       }
     };
@@ -31240,28 +31483,6 @@ exports.default = connectRatingMenu;
 
 var _utils = require("../../lib/utils");
 
-function _toConsumableArray(arr) {
-  return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _nonIterableSpread();
-}
-
-function _nonIterableSpread() {
-  throw new TypeError("Invalid attempt to spread non-iterable instance");
-}
-
-function _iterableToArray(iter) {
-  if (Symbol.iterator in Object(iter) || Object.prototype.toString.call(iter) === "[object Arguments]") return Array.from(iter);
-}
-
-function _arrayWithoutHoles(arr) {
-  if (Array.isArray(arr)) {
-    for (var i = 0, arr2 = new Array(arr.length); i < arr.length; i++) {
-      arr2[i] = arr[i];
-    }
-
-    return arr2;
-  }
-}
-
 function ownKeys(object, enumerableOnly) {
   var keys = Object.keys(object);
 
@@ -31281,13 +31502,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -31311,10 +31532,74 @@ function _defineProperty(obj, key, value) {
   return obj;
 }
 
+function _toConsumableArray(arr) {
+  return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _nonIterableSpread();
+}
+
+function _nonIterableSpread() {
+  throw new TypeError("Invalid attempt to spread non-iterable instance");
+}
+
+function _iterableToArray(iter) {
+  if (Symbol.iterator in Object(iter) || Object.prototype.toString.call(iter) === "[object Arguments]") return Array.from(iter);
+}
+
+function _arrayWithoutHoles(arr) {
+  if (Array.isArray(arr)) {
+    for (var i = 0, arr2 = new Array(arr.length); i < arr.length; i++) {
+      arr2[i] = arr[i];
+    }
+
+    return arr2;
+  }
+}
+
 var withUsage = (0, _utils.createDocumentationMessageGenerator)({
   name: 'rating-menu',
   connector: true
 });
+var $$type = 'ais.ratingMenu';
+
+var createSendEvent = function createSendEvent(_ref) {
+  var instantSearchInstance = _ref.instantSearchInstance,
+      helper = _ref.helper,
+      getRefinedStar = _ref.getRefinedStar,
+      attribute = _ref.attribute;
+  return function () {
+    for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
+      args[_key] = arguments[_key];
+    }
+
+    if (args.length === 1) {
+      instantSearchInstance.sendEventToInsights(args[0]);
+      return;
+    }
+
+    var eventType = args[0],
+        facetValue = args[1],
+        _args$ = args[2],
+        eventName = _args$ === void 0 ? 'Filter Applied' : _args$;
+
+    if (eventType !== 'click') {
+      return;
+    }
+
+    var isRefined = getRefinedStar() === Number(facetValue);
+
+    if (!isRefined) {
+      instantSearchInstance.sendEventToInsights({
+        insightsMethod: 'clickedFilters',
+        widgetType: $$type,
+        eventType: eventType,
+        payload: {
+          eventName: eventName,
+          index: helper.getIndex(),
+          filters: ["".concat(attribute, ">=").concat(facetValue)]
+        }
+      });
+    }
+  };
+};
 /**
  * @typedef {Object} StarRatingItems
  * @property {string} name Name corresponding to the number of stars.
@@ -31400,7 +31685,10 @@ var withUsage = (0, _utils.createDocumentationMessageGenerator)({
  * ]);
  */
 
+
 function connectRatingMenu(renderFn) {
+  var _this = this;
+
   var unmountFn = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : _utils.noop;
   (0, _utils.checkRendering)(renderFn, withUsage());
   return function () {
@@ -31408,102 +31696,153 @@ function connectRatingMenu(renderFn) {
     var attribute = widgetParams.attribute,
         _widgetParams$max = widgetParams.max,
         max = _widgetParams$max === void 0 ? 5 : _widgetParams$max;
+    var sendEvent;
 
     if (!attribute) {
       throw new Error(withUsage('The `attribute` option is required.'));
     }
 
-    return {
-      $$type: 'ais.ratingMenu',
-      init: function init(_ref) {
-        var helper = _ref.helper,
-            createURL = _ref.createURL,
-            instantSearchInstance = _ref.instantSearchInstance;
-        this._toggleRefinement = this._toggleRefinement.bind(this, helper);
+    var _getRefinedStar = function getRefinedStar(state) {
+      var refinements = state.getDisjunctiveRefinements(attribute);
 
-        this._createURL = function (state) {
-          return function (facetValue) {
-            return createURL(state.toggleRefinement(attribute, facetValue));
-          };
-        };
+      if (!refinements.length) {
+        return undefined;
+      }
 
-        renderFn({
-          instantSearchInstance: instantSearchInstance,
-          items: [],
-          hasNoResults: true,
-          refine: this._toggleRefinement,
-          createURL: this._createURL(helper.state),
-          widgetParams: widgetParams
-        }, true);
-      },
-      render: function render(_ref2) {
-        var helper = _ref2.helper,
-            results = _ref2.results,
-            state = _ref2.state,
-            instantSearchInstance = _ref2.instantSearchInstance;
-        var facetValues = [];
-        var allValues = {};
+      return Math.min.apply(Math, _toConsumableArray(refinements.map(Number)));
+    };
 
-        for (var v = max; v >= 0; --v) {
-          allValues[v] = 0;
+    var toggleRefinement = function toggleRefinement(helper, facetValue) {
+      sendEvent('click', facetValue);
+      var isRefined = _getRefinedStar(helper.state) === Number(facetValue);
+      helper.removeDisjunctiveFacetRefinement(attribute);
+
+      if (!isRefined) {
+        for (var val = Number(facetValue); val <= max; ++val) {
+          helper.addDisjunctiveFacetRefinement(attribute, val);
         }
+      }
 
-        (results.getFacetValues(attribute) || []).forEach(function (facet) {
-          var val = Math.round(facet.name);
+      helper.search();
+    };
 
-          if (!val || val > max) {
-            return;
-          }
-
-          for (var _v = val; _v >= 1; --_v) {
-            allValues[_v] += facet.count;
-          }
+    var connectorState = {
+      toggleRefinementFactory: function toggleRefinementFactory(helper) {
+        return toggleRefinement.bind(_this, helper);
+      },
+      createURLFactory: function createURLFactory(_ref2) {
+        var state = _ref2.state,
+            createURL = _ref2.createURL;
+        return function (value) {
+          return createURL(state.toggleRefinement(attribute, value));
+        };
+      }
+    };
+    return {
+      $$type: $$type,
+      init: function init(initOptions) {
+        var instantSearchInstance = initOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(initOptions), {
+          instantSearchInstance: instantSearchInstance
+        }), true);
+      },
+      render: function render(renderOptions) {
+        var instantSearchInstance = renderOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(renderOptions), {
+          instantSearchInstance: instantSearchInstance
+        }), false);
+      },
+      getRenderState: function getRenderState(renderState, renderOptions) {
+        return _objectSpread({}, renderState, {
+          ratingMenu: _objectSpread({}, renderState.ratingMenu, _defineProperty({}, attribute, this.getWidgetRenderState(renderOptions)))
         });
+      },
+      getWidgetRenderState: function getWidgetRenderState(_ref3) {
+        var helper = _ref3.helper,
+            results = _ref3.results,
+            state = _ref3.state,
+            instantSearchInstance = _ref3.instantSearchInstance,
+            createURL = _ref3.createURL;
+        var facetValues = [];
 
-        var refinedStar = this._getRefinedStar(helper.state);
-
-        for (var star = max - 1; star >= 1; --star) {
-          var count = allValues[star];
-
-          if (refinedStar && star !== refinedStar && count === 0) {
-            // skip count==0 when at least 1 refinement is enabled
-            // eslint-disable-next-line no-continue
-            continue;
-          }
-
-          var stars = [];
-
-          for (var i = 1; i <= max; ++i) {
-            stars.push(i <= star);
-          }
-
-          facetValues.push({
-            stars: stars,
-            name: String(star),
-            value: String(star),
-            count: count,
-            isRefined: refinedStar === star
+        if (!sendEvent) {
+          sendEvent = createSendEvent({
+            instantSearchInstance: instantSearchInstance,
+            helper: helper,
+            getRefinedStar: function getRefinedStar() {
+              return _getRefinedStar(helper.state);
+            },
+            attribute: attribute
           });
         }
 
-        renderFn({
-          instantSearchInstance: instantSearchInstance,
+        if (results) {
+          var allValues = {};
+
+          for (var v = max; v >= 0; --v) {
+            allValues[v] = 0;
+          }
+
+          (results.getFacetValues(attribute) || []).forEach(function (facet) {
+            var val = Math.round(facet.name);
+
+            if (!val || val > max) {
+              return;
+            }
+
+            for (var _v = val; _v >= 1; --_v) {
+              allValues[_v] += facet.count;
+            }
+          });
+
+          var refinedStar = _getRefinedStar(state);
+
+          for (var star = max - 1; star >= 1; --star) {
+            var count = allValues[star];
+
+            if (refinedStar && star !== refinedStar && count === 0) {
+              // skip count==0 when at least 1 refinement is enabled
+              // eslint-disable-next-line no-continue
+              continue;
+            }
+
+            var stars = [];
+
+            for (var i = 1; i <= max; ++i) {
+              stars.push(i <= star);
+            }
+
+            facetValues.push({
+              stars: stars,
+              name: String(star),
+              value: String(star),
+              count: count,
+              isRefined: refinedStar === star
+            });
+          }
+        }
+
+        return {
           items: facetValues,
-          hasNoResults: results.nbHits === 0,
-          refine: this._toggleRefinement,
-          createURL: this._createURL(state),
+          hasNoResults: results ? results.nbHits === 0 : true,
+          refine: connectorState.toggleRefinementFactory(helper),
+          sendEvent: sendEvent,
+          createURL: connectorState.createURLFactory({
+            state: state,
+            createURL: createURL
+          }),
           widgetParams: widgetParams
-        }, false);
+        };
       },
-      dispose: function dispose(_ref3) {
-        var state = _ref3.state;
+      dispose: function dispose(_ref4) {
+        var state = _ref4.state;
         unmountFn();
         return state.removeDisjunctiveFacet(attribute);
       },
-      getWidgetState: function getWidgetState(uiState, _ref4) {
-        var searchParameters = _ref4.searchParameters;
+      getWidgetUiState: function getWidgetUiState(uiState, _ref5) {
+        var searchParameters = _ref5.searchParameters;
 
-        var value = this._getRefinedStar(searchParameters);
+        var value = _getRefinedStar(searchParameters);
 
         if (typeof value !== 'number') {
           return uiState;
@@ -31513,8 +31852,8 @@ function connectRatingMenu(renderFn) {
           ratingMenu: _objectSpread({}, uiState.ratingMenu, _defineProperty({}, attribute, value))
         });
       },
-      getWidgetSearchParameters: function getWidgetSearchParameters(searchParameters, _ref5) {
-        var uiState = _ref5.uiState;
+      getWidgetSearchParameters: function getWidgetSearchParameters(searchParameters, _ref6) {
+        var uiState = _ref6.uiState;
         var value = uiState.ratingMenu && uiState.ratingMenu[attribute];
         var withoutRefinements = searchParameters.clearRefinements(attribute);
         var withDisjunctiveFacet = withoutRefinements.addDisjunctiveFacet(attribute);
@@ -31531,27 +31870,6 @@ function connectRatingMenu(renderFn) {
         }).reduce(function (parameters, number) {
           return parameters.addDisjunctiveFacetRefinement(attribute, number);
         }, withDisjunctiveFacet);
-      },
-      _toggleRefinement: function _toggleRefinement(helper, facetValue) {
-        var isRefined = this._getRefinedStar(helper.state) === Number(facetValue);
-        helper.removeDisjunctiveFacetRefinement(attribute);
-
-        if (!isRefined) {
-          for (var val = Number(facetValue); val <= max; ++val) {
-            helper.addDisjunctiveFacetRefinement(attribute, val);
-          }
-        }
-
-        helper.search();
-      },
-      _getRefinedStar: function _getRefinedStar(state) {
-        var refinements = state.getDisjunctiveRefinements(attribute);
-
-        if (!refinements.length) {
-          return undefined;
-        }
-
-        return Math.min.apply(Math, _toConsumableArray(refinements.map(Number)));
       }
     };
   };
@@ -31789,8 +32107,6 @@ exports.default = void 0;
 
 var _preact = require("preact");
 
-var _propTypes = _interopRequireDefault(require("prop-types"));
-
 var _Template = _interopRequireDefault(require("../Template/Template"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
@@ -31849,7 +32165,7 @@ var Stats = function Stats(_ref) {
 
 var _default = Stats;
 exports.default = _default;
-},{"preact":"node_modules/preact/dist/preact.module.js","prop-types":"node_modules/prop-types/index.js","../Template/Template":"node_modules/instantsearch.js/es/components/Template/Template.js"}],"node_modules/instantsearch.js/es/connectors/stats/connectStats.js":[function(require,module,exports) {
+},{"preact":"node_modules/preact/dist/preact.module.js","../Template/Template":"node_modules/instantsearch.js/es/components/Template/Template.js"}],"node_modules/instantsearch.js/es/connectors/stats/connectStats.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -31858,6 +32174,55 @@ Object.defineProperty(exports, "__esModule", {
 exports.default = connectStats;
 
 var _utils = require("../../lib/utils");
+
+function ownKeys(object, enumerableOnly) {
+  var keys = Object.keys(object);
+
+  if (Object.getOwnPropertySymbols) {
+    var symbols = Object.getOwnPropertySymbols(object);
+    if (enumerableOnly) symbols = symbols.filter(function (sym) {
+      return Object.getOwnPropertyDescriptor(object, sym).enumerable;
+    });
+    keys.push.apply(keys, symbols);
+  }
+
+  return keys;
+}
+
+function _objectSpread(target) {
+  for (var i = 1; i < arguments.length; i++) {
+    var source = arguments[i] != null ? arguments[i] : {};
+
+    if (i % 2) {
+      ownKeys(Object(source), true).forEach(function (key) {
+        _defineProperty(target, key, source[key]);
+      });
+    } else if (Object.getOwnPropertyDescriptors) {
+      Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
+    } else {
+      ownKeys(Object(source)).forEach(function (key) {
+        Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
+      });
+    }
+  }
+
+  return target;
+}
+
+function _defineProperty(obj, key, value) {
+  if (key in obj) {
+    Object.defineProperty(obj, key, {
+      value: value,
+      enumerable: true,
+      configurable: true,
+      writable: true
+    });
+  } else {
+    obj[key] = value;
+  }
+
+  return obj;
+}
 
 var withUsage = (0, _utils.createDocumentationMessageGenerator)({
   name: 'stats',
@@ -31875,13 +32240,17 @@ var withUsage = (0, _utils.createDocumentationMessageGenerator)({
  */
 
 /**
+ * @typedef {Object} CustomStatsWidgetOptions
+ */
+
+/**
  * **Stats** connector provides the logic to build a custom widget that will displays
  * search statistics (hits number and processing time).
  *
  * @type {Connector}
  * @param {function(StatsRenderingOptions, boolean)} renderFn Rendering function for the custom **Stats** widget.
  * @param {function} unmountFn Unmount function called when the widget is disposed.
- * @return {function} Re-usable widget factory for a custom **Stats** widget.
+ * @return {function(CustomStatsWidgetOptions)} Re-usable widget factory for a custom **Stats** widget.
  * @example
  * // custom `renderFn` to render the custom Stats widget
  * function renderFn(StatsRenderingOptions, isFirstRendering) {
@@ -31909,25 +32278,43 @@ function connectStats(renderFn) {
     var widgetParams = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
     return {
       $$type: 'ais.stats',
-      init: function init(_ref) {
-        var helper = _ref.helper,
-            instantSearchInstance = _ref.instantSearchInstance;
-        renderFn({
-          instantSearchInstance: instantSearchInstance,
-          hitsPerPage: helper.state.hitsPerPage,
-          nbHits: 0,
-          nbPages: 0,
-          page: helper.state.page || 0,
-          processingTimeMS: -1,
-          query: helper.state.query || '',
-          widgetParams: widgetParams
-        }, true);
+      init: function init(initOptions) {
+        var instantSearchInstance = initOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(initOptions), {
+          instantSearchInstance: instantSearchInstance
+        }), true);
       },
-      render: function render(_ref2) {
-        var results = _ref2.results,
-            instantSearchInstance = _ref2.instantSearchInstance;
-        renderFn({
-          instantSearchInstance: instantSearchInstance,
+      render: function render(renderOptions) {
+        var instantSearchInstance = renderOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(renderOptions), {
+          instantSearchInstance: instantSearchInstance
+        }), false);
+      },
+      dispose: function dispose() {
+        unmountFn();
+      },
+      getRenderState: function getRenderState(renderState, renderOptions) {
+        return _objectSpread({}, renderState, {
+          stats: this.getWidgetRenderState(renderOptions)
+        });
+      },
+      getWidgetRenderState: function getWidgetRenderState(_ref) {
+        var results = _ref.results,
+            helper = _ref.helper;
+
+        if (!results) {
+          return {
+            hitsPerPage: helper.state.hitsPerPage,
+            nbHits: 0,
+            nbPages: 0,
+            page: helper.state.page || 0,
+            processingTimeMS: -1,
+            query: helper.state.query || '',
+            widgetParams: widgetParams
+          };
+        }
+
+        return {
           hitsPerPage: results.hitsPerPage,
           nbHits: results.nbHits,
           nbPages: results.nbPages,
@@ -31935,10 +32322,7 @@ function connectStats(renderFn) {
           processingTimeMS: results.processingTimeMS,
           query: results.query,
           widgetParams: widgetParams
-        }, false);
-      },
-      dispose: function dispose() {
-        unmountFn();
+        };
       }
     };
   };
@@ -32110,8 +32494,6 @@ exports.default = void 0;
 
 var _preact = require("preact");
 
-var _propTypes = _interopRequireDefault(require("prop-types"));
-
 var _Template = _interopRequireDefault(require("../Template/Template"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
@@ -32164,7 +32546,7 @@ var ToggleRefinement = function ToggleRefinement(_ref) {
 
 var _default = ToggleRefinement;
 exports.default = _default;
-},{"preact":"node_modules/preact/dist/preact.module.js","prop-types":"node_modules/prop-types/index.js","../Template/Template":"node_modules/instantsearch.js/es/components/Template/Template.js"}],"node_modules/instantsearch.js/es/connectors/toggle-refinement/connectToggleRefinement.js":[function(require,module,exports) {
+},{"preact":"node_modules/preact/dist/preact.module.js","../Template/Template":"node_modules/instantsearch.js/es/components/Template/Template.js"}],"node_modules/instantsearch.js/es/connectors/toggle-refinement/connectToggleRefinement.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -32193,13 +32575,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -32227,6 +32609,49 @@ var withUsage = (0, _utils.createDocumentationMessageGenerator)({
   name: 'toggle-refinement',
   connector: true
 });
+var $$type = 'ais.toggleRefinement';
+
+var createSendEvent = function createSendEvent(_ref) {
+  var instantSearchInstance = _ref.instantSearchInstance,
+      attribute = _ref.attribute,
+      on = _ref.on,
+      helper = _ref.helper;
+  return function () {
+    for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
+      args[_key] = arguments[_key];
+    }
+
+    if (args.length === 1) {
+      instantSearchInstance.sendEventToInsights(args[0]);
+      return;
+    }
+
+    var eventType = args[0],
+        isRefined = args[1],
+        _args$ = args[2],
+        eventName = _args$ === void 0 ? 'Filter Applied' : _args$;
+
+    if (eventType !== 'click' || on === undefined) {
+      return;
+    } // Checking
+
+
+    if (!isRefined) {
+      instantSearchInstance.sendEventToInsights({
+        insightsMethod: 'clickedFilters',
+        widgetType: $$type,
+        eventType: eventType,
+        payload: {
+          eventName: eventName,
+          index: helper.getIndex(),
+          filters: on.map(function (value) {
+            return "".concat(attribute, ":").concat(JSON.stringify(value));
+          })
+        }
+      });
+    }
+  };
+};
 /**
  * @typedef {Object} ToggleValue
  * @property {boolean} isRefined `true` if the toggle is on.
@@ -32303,6 +32728,7 @@ var withUsage = (0, _utils.createDocumentationMessageGenerator)({
  * ]);
  */
 
+
 function connectToggleRefinement(renderFn) {
   var unmountFn = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : _utils.noop;
   (0, _utils.checkRendering)(renderFn, withUsage());
@@ -32319,60 +32745,105 @@ function connectToggleRefinement(renderFn) {
 
     var hasAnOffValue = userOff !== undefined;
     var hasAnOnValue = userOn !== undefined;
-    var on = hasAnOnValue ? (0, _utils.escapeRefinement)(userOn) : undefined;
-    var off = hasAnOffValue ? (0, _utils.escapeRefinement)(userOff) : undefined;
-    return {
-      $$type: 'ais.toggleRefinement',
-      _toggleRefinement: function _toggleRefinement(helper) {
-        var _ref = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {},
-            isRefined = _ref.isRefined; // Checking
+    var on = hasAnOnValue ? (0, _utils.toArray)(userOn).map(_utils.escapeRefinement) : undefined;
+    var off = hasAnOffValue ? (0, _utils.toArray)(userOff).map(_utils.escapeRefinement) : undefined;
+    var sendEvent;
+
+    var toggleRefinementFactory = function toggleRefinementFactory(helper) {
+      return function () {
+        var _ref2 = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {},
+            isRefined = _ref2.isRefined; // Checking
 
 
         if (!isRefined) {
+          sendEvent('click', isRefined);
+
           if (hasAnOffValue) {
-            helper.removeDisjunctiveFacetRefinement(attribute, off);
+            off.forEach(function (v) {
+              return helper.removeDisjunctiveFacetRefinement(attribute, v);
+            });
           }
 
-          helper.addDisjunctiveFacetRefinement(attribute, on);
+          on.forEach(function (v) {
+            return helper.addDisjunctiveFacetRefinement(attribute, v);
+          });
         } else {
           // Unchecking
-          helper.removeDisjunctiveFacetRefinement(attribute, on);
+          on.forEach(function (v) {
+            return helper.removeDisjunctiveFacetRefinement(attribute, v);
+          });
 
           if (hasAnOffValue) {
-            helper.addDisjunctiveFacetRefinement(attribute, off);
+            off.forEach(function (v) {
+              return helper.addDisjunctiveFacetRefinement(attribute, v);
+            });
           }
         }
 
         helper.search();
-      },
-      init: function init(_ref2) {
-        var _this = this;
+      };
+    };
 
-        var state = _ref2.state,
-            helper = _ref2.helper,
-            createURL = _ref2.createURL,
-            instantSearchInstance = _ref2.instantSearchInstance;
+    var connectorState = {
+      createURLFactory: function createURLFactory(isRefined, _ref3) {
+        var state = _ref3.state,
+            createURL = _ref3.createURL;
+        return function () {
+          var valuesToRemove = isRefined ? on : off;
 
-        this._createURL = function (isCurrentlyRefined) {
-          return function () {
-            return createURL(state.removeDisjunctiveFacetRefinement(attribute, isCurrentlyRefined ? on : off).addDisjunctiveFacetRefinement(attribute, isCurrentlyRefined ? off : on));
-          };
-        };
-
-        this.toggleRefinement = function (opts) {
-          _this._toggleRefinement(helper, opts);
-        };
-
-        var isRefined = state.isDisjunctiveFacetRefined(attribute, on); // no need to refine anything at init if no custom off values
-
-        if (hasAnOffValue) {
-          // Add filtering on the 'off' value if set
-          if (!isRefined) {
-            var currentPage = helper.state.page;
-            helper.addDisjunctiveFacetRefinement(attribute, off).setPage(currentPage);
+          if (valuesToRemove) {
+            valuesToRemove.forEach(function (v) {
+              state.removeDisjunctiveFacetRefinement(attribute, v);
+            });
           }
-        }
 
+          var valuesToAdd = isRefined ? off : on;
+
+          if (valuesToAdd) {
+            valuesToAdd.forEach(function (v) {
+              state.addDisjunctiveFacetRefinement(attribute, v);
+            });
+          }
+
+          return createURL(state);
+        };
+      }
+    };
+    return {
+      $$type: $$type,
+      init: function init(initOptions) {
+        var instantSearchInstance = initOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(initOptions), {
+          instantSearchInstance: instantSearchInstance
+        }), true);
+      },
+      render: function render(renderOptions) {
+        var instantSearchInstance = renderOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(renderOptions), {
+          instantSearchInstance: instantSearchInstance
+        }), false);
+      },
+      dispose: function dispose(_ref4) {
+        var state = _ref4.state;
+        unmountFn();
+        return state.removeDisjunctiveFacet(attribute);
+      },
+      getRenderState: function getRenderState(renderState, renderOptions) {
+        return _objectSpread({}, renderState, {
+          toggleRefinement: this.getWidgetRenderState(renderOptions)
+        });
+      },
+      getWidgetRenderState: function getWidgetRenderState(_ref5) {
+        var state = _ref5.state,
+            helper = _ref5.helper,
+            results = _ref5.results,
+            createURL = _ref5.createURL,
+            instantSearchInstance = _ref5.instantSearchInstance;
+        var isRefined = results ? on === null || on === void 0 ? void 0 : on.every(function (v) {
+          return helper.state.isDisjunctiveFacetRefined(attribute, v);
+        }) : on === null || on === void 0 ? void 0 : on.every(function (v) {
+          return state.isDisjunctiveFacetRefined(attribute, v);
+        });
         var onFacetValue = {
           isRefined: isRefined,
           count: 0
@@ -32381,77 +32852,88 @@ function connectToggleRefinement(renderFn) {
           isRefined: hasAnOffValue && !isRefined,
           count: 0
         };
-        var value = {
-          name: attribute,
-          isRefined: isRefined,
-          count: null,
-          onFacetValue: onFacetValue,
-          offFacetValue: offFacetValue
-        };
-        renderFn({
-          value: value,
-          createURL: this._createURL(value.isRefined),
-          refine: this.toggleRefinement,
-          instantSearchInstance: instantSearchInstance,
-          widgetParams: widgetParams
-        }, true);
-      },
-      render: function render(_ref3) {
-        var helper = _ref3.helper,
-            results = _ref3.results,
-            state = _ref3.state,
-            instantSearchInstance = _ref3.instantSearchInstance;
-        var isRefined = helper.state.isDisjunctiveFacetRefined(attribute, on);
-        var offValue = off === undefined ? false : off;
-        var allFacetValues = results.getFacetValues(attribute) || [];
-        var onData = (0, _utils.find)(allFacetValues, function (_ref4) {
-          var name = _ref4.name;
-          return name === (0, _utils.unescapeRefinement)(on);
-        });
-        var onFacetValue = {
-          isRefined: onData !== undefined ? onData.isRefined : false,
-          count: onData === undefined ? null : onData.count
-        };
-        var offData = hasAnOffValue ? (0, _utils.find)(allFacetValues, function (_ref5) {
-          var name = _ref5.name;
-          return name === (0, _utils.unescapeRefinement)(offValue);
-        }) : undefined;
-        var offFacetValue = {
-          isRefined: offData !== undefined ? offData.isRefined : false,
-          count: offData === undefined ? allFacetValues.reduce(function (total, _ref6) {
-            var count = _ref6.count;
-            return total + count;
-          }, 0) : offData.count
-        }; // what will we show by default,
-        // if checkbox is not checked, show: [ ] free shipping (countWhenChecked)
-        // if checkbox is checked, show: [x] free shipping (countWhenNotChecked)
+
+        if (results) {
+          var offValue = (0, _utils.toArray)(off || false);
+          var allFacetValues = results.getFacetValues(attribute) || [];
+          var onData = on === null || on === void 0 ? void 0 : on.map(function (v) {
+            return (0, _utils.find)(allFacetValues, function (_ref6) {
+              var name = _ref6.name;
+              return name === (0, _utils.unescapeRefinement)(v);
+            });
+          }).filter(function (v) {
+            return v !== undefined;
+          });
+          var offData = hasAnOffValue ? offValue.map(function (v) {
+            return (0, _utils.find)(allFacetValues, function (_ref7) {
+              var name = _ref7.name;
+              return name === (0, _utils.unescapeRefinement)(v);
+            });
+          }).filter(function (v) {
+            return v !== undefined;
+          }) : [];
+          onFacetValue = {
+            isRefined: onData.length ? onData.every(function (v) {
+              return v.isRefined;
+            }) : false,
+            count: onData.reduce(function (acc, v) {
+              return acc + v.count;
+            }, 0) || null
+          };
+          offFacetValue = {
+            isRefined: offData.length ? offData.every(function (v) {
+              return v.isRefined;
+            }) : false,
+            count: offData.reduce(function (acc, v) {
+              return acc + v.count;
+            }, 0) || allFacetValues.reduce(function (total, _ref8) {
+              var count = _ref8.count;
+              return total + count;
+            }, 0)
+          };
+        } else if (hasAnOffValue && !isRefined) {
+          if (off) {
+            off.forEach(function (v) {
+              return helper.addDisjunctiveFacetRefinement(attribute, v);
+            });
+          }
+
+          helper.setPage(helper.state.page);
+        }
+
+        if (!sendEvent) {
+          sendEvent = createSendEvent({
+            instantSearchInstance: instantSearchInstance,
+            attribute: attribute,
+            on: on,
+            helper: helper
+          });
+        }
 
         var nextRefinement = isRefined ? offFacetValue : onFacetValue;
-        var value = {
-          name: attribute,
-          isRefined: isRefined,
-          count: nextRefinement === undefined ? null : nextRefinement.count,
-          onFacetValue: onFacetValue,
-          offFacetValue: offFacetValue
-        };
-        renderFn({
-          value: value,
+        return {
+          value: {
+            name: attribute,
+            isRefined: isRefined,
+            count: results ? nextRefinement.count : null,
+            onFacetValue: onFacetValue,
+            offFacetValue: offFacetValue
+          },
           state: state,
-          createURL: this._createURL(value.isRefined),
-          refine: this.toggleRefinement,
-          helper: helper,
-          instantSearchInstance: instantSearchInstance,
+          createURL: connectorState.createURLFactory(isRefined, {
+            state: state,
+            createURL: createURL
+          }),
+          sendEvent: sendEvent,
+          refine: toggleRefinementFactory(helper),
           widgetParams: widgetParams
-        }, false);
+        };
       },
-      dispose: function dispose(_ref7) {
-        var state = _ref7.state;
-        unmountFn();
-        return state.removeDisjunctiveFacet(attribute);
-      },
-      getWidgetState: function getWidgetState(uiState, _ref8) {
-        var searchParameters = _ref8.searchParameters;
-        var isRefined = searchParameters.isDisjunctiveFacetRefined(attribute, on);
+      getWidgetUiState: function getWidgetUiState(uiState, _ref9) {
+        var searchParameters = _ref9.searchParameters;
+        var isRefined = on && on.every(function (v) {
+          return searchParameters.isDisjunctiveFacetRefined(attribute, v);
+        });
 
         if (!isRefined) {
           return uiState;
@@ -32461,18 +32943,30 @@ function connectToggleRefinement(renderFn) {
           toggle: _objectSpread({}, uiState.toggle, _defineProperty({}, attribute, isRefined))
         });
       },
-      getWidgetSearchParameters: function getWidgetSearchParameters(searchParameters, _ref9) {
-        var uiState = _ref9.uiState;
+      getWidgetSearchParameters: function getWidgetSearchParameters(searchParameters, _ref10) {
+        var uiState = _ref10.uiState;
         var withFacetConfiguration = searchParameters.clearRefinements(attribute).addDisjunctiveFacet(attribute);
         var isRefined = Boolean(uiState.toggle && uiState.toggle[attribute]);
 
         if (isRefined) {
-          return withFacetConfiguration.addDisjunctiveFacetRefinement(attribute, on);
+          if (on) {
+            on.forEach(function (v) {
+              withFacetConfiguration = withFacetConfiguration.addDisjunctiveFacetRefinement(attribute, v);
+            });
+          }
+
+          return withFacetConfiguration;
         } // It's not refined with an `off` value
 
 
         if (hasAnOffValue) {
-          return withFacetConfiguration.addDisjunctiveFacetRefinement(attribute, off);
+          if (off) {
+            off.forEach(function (v) {
+              withFacetConfiguration = withFacetConfiguration.addDisjunctiveFacetRefinement(attribute, v);
+            });
+          }
+
+          return withFacetConfiguration;
         } // It's not refined without an `off` value
 
 
@@ -32578,8 +33072,8 @@ var renderer = function renderer(_ref) {
  * @typedef {Object} ToggleWidgetOptions
  * @property {string|HTMLElement} container Place where to insert the widget in your webpage.
  * @property {string} attribute Name of the attribute for faceting (eg. "free_shipping").
- * @property {string|number|boolean} on Value to filter on when checked.
- * @property {string|number|boolean} off Value to filter on when unchecked.
+ * @property {string|number|boolean|array} on Value to filter on when checked.
+ * @property {string|number|boolean|array} off Value to filter on when unchecked.
  * element (when using the default template). By default when switching to `off`, no refinement will be asked. So you
  * will get both `true` and `false` results. If you set the off value to `false` then you will get only objects
  * having `false` has a value for the selected attribute.
@@ -32691,13 +33185,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -32723,10 +33217,10 @@ function _defineProperty(obj, key, value) {
 
 var withUsage = (0, _utils.createDocumentationMessageGenerator)({
   name: 'analytics'
-});
+}); // @major this widget will be removed from the next major version.
 
-function analytics() {
-  var _ref = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {},
+var analytics = function analytics(widgetParams) {
+  var _ref = widgetParams || {},
       pushFunction = _ref.pushFunction,
       _ref$delay = _ref.delay,
       delay = _ref$delay === void 0 ? 3000 : _ref$delay,
@@ -32741,6 +33235,7 @@ function analytics() {
     throw new Error(withUsage('The `pushFunction` option is required.'));
   }
 
+  "development" === 'development' ? (0, _utils.warning)(false, "`analytics` widget has been deprecated. It is still supported in 4.x releases, but not further. It is replaced by the `insights` middleware.\n\nFor the migration, visit https://www.algolia.com/doc/guides/building-search-ui/upgrade-guides/js/#analytics-widget") : void 0;
   var cachedState = null;
 
   var serializeRefinements = function serializeRefinements(parameters) {
@@ -32872,9 +33367,19 @@ function analytics() {
         document.removeEventListener('click', onClick);
         window.removeEventListener('beforeunload', onUnload);
       }
+    },
+    getRenderState: function getRenderState(renderState, renderOptions) {
+      return _objectSpread({}, renderState, {
+        analytics: this.getWidgetRenderState(renderOptions)
+      });
+    },
+    getWidgetRenderState: function getWidgetRenderState() {
+      return {
+        widgetParams: widgetParams
+      };
     }
   };
-}
+};
 
 var _default = analytics;
 exports.default = _default;
@@ -32983,9 +33488,58 @@ exports.default = _default;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.default = connectBreadcrumb;
+exports.default = void 0;
 
 var _utils = require("../../lib/utils");
+
+function ownKeys(object, enumerableOnly) {
+  var keys = Object.keys(object);
+
+  if (Object.getOwnPropertySymbols) {
+    var symbols = Object.getOwnPropertySymbols(object);
+    if (enumerableOnly) symbols = symbols.filter(function (sym) {
+      return Object.getOwnPropertyDescriptor(object, sym).enumerable;
+    });
+    keys.push.apply(keys, symbols);
+  }
+
+  return keys;
+}
+
+function _objectSpread(target) {
+  for (var i = 1; i < arguments.length; i++) {
+    var source = arguments[i] != null ? arguments[i] : {};
+
+    if (i % 2) {
+      ownKeys(Object(source), true).forEach(function (key) {
+        _defineProperty(target, key, source[key]);
+      });
+    } else if (Object.getOwnPropertyDescriptors) {
+      Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
+    } else {
+      ownKeys(Object(source)).forEach(function (key) {
+        Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
+      });
+    }
+  }
+
+  return target;
+}
+
+function _defineProperty(obj, key, value) {
+  if (key in obj) {
+    Object.defineProperty(obj, key, {
+      value: value,
+      enumerable: true,
+      configurable: true,
+      writable: true
+    });
+  } else {
+    obj[key] = value;
+  }
+
+  return obj;
+}
 
 function _slicedToArray(arr, i) {
   return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _nonIterableRest();
@@ -33033,54 +33587,22 @@ var withUsage = (0, _utils.createDocumentationMessageGenerator)({
   name: 'breadcrumb',
   connector: true
 });
-/**
- * @typedef {Object} BreadcrumbItem
- * @property {string} label Label of the category or subcategory.
- * @property {string} value Value of breadcrumb item.
- */
 
-/**
- * @typedef {Object} CustomBreadcrumbWidgetOptions
- * @property {string[]} attributes Attributes to use to generate the hierarchy of the breadcrumb.
- * @property {string} [rootPath = null] Prefix path to use if the first level is not the root level.
- * @property {function(object[]):object[]} [transformItems] Function to transform the items passed to the templates.
- *
- * You can also use a sort function that behaves like the standard Javascript [compareFunction](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/sort#Syntax).
- */
-
-/**
- * @typedef {Object} BreadcrumbRenderingOptions
- * @property {function(item.value): string} createURL Creates an url for the next state for a clicked item. The special value `null` is used for the `Home` (or root) item of the breadcrumb and will return an empty array.
- * @property {BreadcrumbItem[]} items Values to be rendered.
- * @property {function(item.value)} refine Sets the path of the hierarchical filter and triggers a new search.
- * @property {Object} widgetParams All original `CustomBreadcrumbWidgetOptions` forwarded to the `renderFn`.
- */
-
-/**
- * **Breadcrumb** connector provides the logic to build a custom widget
- * that will give the user the ability to see the current path in a hierarchical facet.
- *
- * This is commonly used in websites that have a large amount of content organized in a hierarchical manner (usually e-commerce websites).
- * @type {Connector}
- * @param {function(BreadcrumbRenderingOptions, boolean)} renderFn Rendering function for the custom **Breadcrumb* widget.
- * @param {function} unmountFn Unmount function called when the widget is disposed.
- * @return {function(CustomBreadcrumbWidgetOptions)} Re-usable widget factory for a custom **Breadcrumb** widget.
- */
-
-function connectBreadcrumb(renderFn) {
+var connectBreadcrumb = function connectBreadcrumb(renderFn) {
   var unmountFn = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : _utils.noop;
   (0, _utils.checkRendering)(renderFn, withUsage());
-  return function () {
-    var widgetParams = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-    var attributes = widgetParams.attributes,
-        _widgetParams$separat = widgetParams.separator,
-        separator = _widgetParams$separat === void 0 ? ' > ' : _widgetParams$separat,
-        _widgetParams$rootPat = widgetParams.rootPath,
-        rootPath = _widgetParams$rootPat === void 0 ? null : _widgetParams$rootPat,
-        _widgetParams$transfo = widgetParams.transformItems,
-        transformItems = _widgetParams$transfo === void 0 ? function (items) {
+  var connectorState = {};
+  return function (widgetParams) {
+    var _ref = widgetParams || {},
+        attributes = _ref.attributes,
+        _ref$separator = _ref.separator,
+        separator = _ref$separator === void 0 ? ' > ' : _ref$separator,
+        _ref$rootPath = _ref.rootPath,
+        rootPath = _ref$rootPath === void 0 ? null : _ref$rootPath,
+        _ref$transformItems = _ref.transformItems,
+        transformItems = _ref$transformItems === void 0 ? function (items) {
       return items;
-    } : _widgetParams$transfo;
+    } : _ref$transformItems;
 
     if (!attributes || !Array.isArray(attributes) || attributes.length === 0) {
       throw new Error(withUsage('The `attributes` option expects an array of strings.'));
@@ -33091,66 +33613,81 @@ function connectBreadcrumb(renderFn) {
 
     return {
       $$type: 'ais.breadcrumb',
-      init: function init(_ref) {
-        var createURL = _ref.createURL,
-            helper = _ref.helper,
-            instantSearchInstance = _ref.instantSearchInstance;
-
-        this._createURL = function (facetValue) {
-          if (!facetValue) {
-            var breadcrumb = helper.getHierarchicalFacetBreadcrumb(hierarchicalFacetName);
-
-            if (breadcrumb.length > 0) {
-              return createURL(helper.state.toggleRefinement(hierarchicalFacetName, breadcrumb[0]));
-            }
-          }
-
-          return createURL(helper.state.toggleRefinement(hierarchicalFacetName, facetValue));
-        };
-
-        this._refine = function (facetValue) {
-          if (!facetValue) {
-            var breadcrumb = helper.getHierarchicalFacetBreadcrumb(hierarchicalFacetName);
-
-            if (breadcrumb.length > 0) {
-              helper.toggleRefinement(hierarchicalFacetName, breadcrumb[0]).search();
-            }
-          } else {
-            helper.toggleRefinement(hierarchicalFacetName, facetValue).search();
-          }
-        };
-
-        renderFn({
-          createURL: this._createURL,
-          canRefine: false,
-          instantSearchInstance: instantSearchInstance,
-          items: [],
-          refine: this._refine,
-          widgetParams: widgetParams
-        }, true);
+      init: function init(initOptions) {
+        renderFn(_objectSpread({}, this.getWidgetRenderState(initOptions), {
+          instantSearchInstance: initOptions.instantSearchInstance
+        }), true);
       },
-      render: function render(_ref2) {
-        var instantSearchInstance = _ref2.instantSearchInstance,
-            results = _ref2.results,
-            state = _ref2.state;
-
-        var _state$hierarchicalFa = _slicedToArray(state.hierarchicalFacets, 1),
-            facetName = _state$hierarchicalFa[0].name;
-
-        var facetValues = results.getFacetValues(facetName);
-        var data = Array.isArray(facetValues.data) ? facetValues.data : [];
-        var items = transformItems(shiftItemsValues(prepareItems(data)));
-        renderFn({
-          canRefine: items.length > 0,
-          createURL: this._createURL,
-          instantSearchInstance: instantSearchInstance,
-          items: items,
-          refine: this._refine,
-          widgetParams: widgetParams
-        }, false);
+      render: function render(renderOptions) {
+        renderFn(_objectSpread({}, this.getWidgetRenderState(renderOptions), {
+          instantSearchInstance: renderOptions.instantSearchInstance
+        }), false);
       },
       dispose: function dispose() {
         unmountFn();
+      },
+      getRenderState: function getRenderState(renderState, renderOptions) {
+        return _objectSpread({}, renderState, {
+          breadcrumb: _objectSpread({}, renderState.breadcrumb, _defineProperty({}, hierarchicalFacetName, this.getWidgetRenderState(renderOptions)))
+        });
+      },
+      getWidgetRenderState: function getWidgetRenderState(_ref2) {
+        var helper = _ref2.helper,
+            createURL = _ref2.createURL,
+            results = _ref2.results,
+            state = _ref2.state;
+
+        function getItems() {
+          if (!results) {
+            return [];
+          }
+
+          var _state$hierarchicalFa = _slicedToArray(state.hierarchicalFacets, 1),
+              facetName = _state$hierarchicalFa[0].name;
+
+          var facetValues = results.getFacetValues(facetName, {});
+          var data = Array.isArray(facetValues.data) ? facetValues.data : [];
+          var items = transformItems(shiftItemsValues(prepareItems(data)));
+          return items;
+        }
+
+        var items = getItems();
+
+        if (!connectorState.createURL) {
+          connectorState.createURL = function (facetValue) {
+            if (!facetValue) {
+              var breadcrumb = helper.getHierarchicalFacetBreadcrumb(hierarchicalFacetName);
+
+              if (breadcrumb.length > 0) {
+                return createURL(helper.state.toggleFacetRefinement(hierarchicalFacetName, breadcrumb[0]));
+              }
+            }
+
+            return createURL(helper.state.toggleFacetRefinement(hierarchicalFacetName, facetValue));
+          };
+        }
+
+        if (!connectorState.refine) {
+          connectorState.refine = function (facetValue) {
+            if (!facetValue) {
+              var breadcrumb = helper.getHierarchicalFacetBreadcrumb(hierarchicalFacetName);
+
+              if (breadcrumb.length > 0) {
+                helper.toggleRefinement(hierarchicalFacetName, breadcrumb[0]).search();
+              }
+            } else {
+              helper.toggleRefinement(hierarchicalFacetName, facetValue).search();
+            }
+          };
+        }
+
+        return {
+          canRefine: items.length > 0,
+          createURL: connectorState.createURL,
+          items: items,
+          refine: connectorState.refine,
+          widgetParams: widgetParams
+        };
       },
       getWidgetSearchParameters: function getWidgetSearchParameters(searchParameters) {
         if (searchParameters.isHierarchicalFacet(hierarchicalFacetName)) {
@@ -33168,7 +33705,7 @@ function connectBreadcrumb(renderFn) {
       }
     };
   };
-}
+};
 
 function prepareItems(data) {
   return data.reduce(function (result, currentItem) {
@@ -33195,6 +33732,9 @@ function shiftItemsValues(array) {
     };
   });
 }
+
+var _default = connectBreadcrumb;
+exports.default = _default;
 },{"../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js"}],"node_modules/instantsearch.js/es/widgets/breadcrumb/defaultTemplates.js":[function(require,module,exports) {
 "use strict";
 
@@ -33213,7 +33753,7 @@ exports.default = _default;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.default = breadcrumb;
+exports.default = void 0;
 
 var _preact = require("preact");
 
@@ -33268,96 +33808,13 @@ var renderer = function renderer(_ref) {
     }), containerNode);
   };
 };
-/**
- * @typedef {Object} BreadcrumbCSSClasses
- * @property {string|string[]} [root] CSS class to add to the root element of the widget.
- * @property {string|string[]} [noRefinementRoot] CSS class to add to the root element of the widget if there are no refinements.
- * @property {string|string[]} [list] CSS class to add to the list element.
- * @property {string|string[]} [item] CSS class to add to the items of the list. The items contains the link and the separator.
- * @property {string|string[]} [selectedItem] CSS class to add to the selected item in the list: the last one or the home if there are no refinements.
- * @property {string|string[]} [separator] CSS class to add to the separator.
- * @property {string|string[]} [link] CSS class to add to the links in the items.
- */
 
-/**
- * @typedef {Object} BreadcrumbTemplates
- * @property {string|function(object):string} [home = 'Home'] Label of the breadcrumb's first element.
- * @property {string|function(object):string} [separator = '>'] Symbol used to separate the elements of the breadcrumb.
- */
-
-/**
- * @typedef {Object} BreadcrumbWidgetOptions
- * @property {string|HTMLElement} container CSS Selector or HTMLElement to insert the widget.
- * @property {string[]} attributes Array of attributes to use to generate the breadcrumb.
- * @property {string} [separator = ' > '] The level separator used in the records.
- * @property {string} [rootPath = null] Prefix path to use if the first level is not the root level.
- * @property {BreadcrumbTemplates} [templates] Templates to use for the widget.
- * @property {function(object[]):object[]} [transformItems] Function to transform the items passed to the templates.
- * @property {BreadcrumbCSSClasses} [cssClasses] CSS classes to add to the wrapping elements.
- */
-
-/**
- * The breadcrumb widget is a secondary navigation scheme that allows the user to see where the current page is in relation to the facet's hierarchy.
- *
- * It reduces the number of actions a user needs to take in order to get to a higher-level page and improve the discoverability of the app or website's sections and pages.
- * It is commonly used for websites with a large amount of data organized into categories with subcategories.
- *
- * All attributes (lvl0, lvl1 in this case) must be declared as [attributes for faceting](https://www.algolia.com/doc/guides/searching/faceting/#declaring-attributes-for-faceting) in your
- * Algolia settings.
- *
- * @requirements
- * Your objects must be formatted in a specific way to be
- * able to display a breadcrumb. Here's an example:
- *
- * ```javascript
- * {
- *   "objectID": "123",
- *   "name": "orange",
- *   "categories": {
- *     "lvl0": "fruits",
- *     "lvl1": "fruits > citrus"
- *   }
- * }
- * ```
- *
- * Each level must be specified entirely.
- * It's also possible to have multiple values per level, for instance:
- *
- * ```javascript
- * {
- *   "objectID": "123",
- *   "name": "orange",
- *   "categories": {
- *     "lvl0": ["fruits", "vitamins"],
- *     "lvl1": ["fruits > citrus", "vitamins > C"]
- *   }
- * }
- * ```
- * @type {WidgetFactory}
- * @devNovel Breadcrumb
- * @category navigation
- * @param {BreadcrumbWidgetOptions} $0 The Breadcrumb widget options.
- * @return {Widget} A new Breadcrumb widget instance.
- * @example
- * search.addWidgets([
- *   instantsearch.widgets.breadcrumb({
- *     container: '#breadcrumb',
- *     attributes: ['hierarchicalCategories.lvl0', 'hierarchicalCategories.lvl1', 'hierarchicalCategories.lvl2'],
- *     templates: { home: 'Home Page' },
- *     separator: ' / ',
- *     rootPath: 'Cameras & Camcorders > Digital Cameras',
- *   })
- * ]);
- */
-
-
-function breadcrumb() {
-  var _ref3 = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {},
+var breadcrumb = function breadcrumb(widgetOptions) {
+  var _ref3 = widgetOptions || {},
       container = _ref3.container,
       attributes = _ref3.attributes,
       separator = _ref3.separator,
-      _ref3$rootPath = _ref3.rootPath,
-      rootPath = _ref3$rootPath === void 0 ? null : _ref3$rootPath,
+      rootPath = _ref3.rootPath,
       transformItems = _ref3.transformItems,
       _ref3$templates = _ref3.templates,
       templates = _ref3$templates === void 0 ? _defaultTemplates.default : _ref3$templates,
@@ -33406,7 +33863,10 @@ function breadcrumb() {
     rootPath: rootPath,
     transformItems: transformItems
   });
-}
+};
+
+var _default = breadcrumb;
+exports.default = _default;
 },{"preact":"node_modules/preact/dist/preact.module.js","classnames":"node_modules/classnames/index.js","../../components/Breadcrumb/Breadcrumb":"node_modules/instantsearch.js/es/components/Breadcrumb/Breadcrumb.js","../../connectors/breadcrumb/connectBreadcrumb":"node_modules/instantsearch.js/es/connectors/breadcrumb/connectBreadcrumb.js","./defaultTemplates":"node_modules/instantsearch.js/es/widgets/breadcrumb/defaultTemplates.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js","../../lib/suit":"node_modules/instantsearch.js/es/lib/suit.js"}],"node_modules/instantsearch.js/es/components/MenuSelect/MenuSelect.js":[function(require,module,exports) {
 "use strict";
 
@@ -33417,8 +33877,6 @@ exports.default = void 0;
 
 var _preact = require("preact");
 
-var _propTypes = _interopRequireDefault(require("prop-types"));
-
 var _classnames = _interopRequireDefault(require("classnames"));
 
 var _utils = require("../../lib/utils");
@@ -33426,20 +33884,6 @@ var _utils = require("../../lib/utils");
 var _Template = _interopRequireDefault(require("../Template/Template"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function _typeof(obj) {
-  if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") {
-    _typeof = function _typeof(obj) {
-      return typeof obj;
-    };
-  } else {
-    _typeof = function _typeof(obj) {
-      return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj;
-    };
-  }
-
-  return _typeof(obj);
-}
 
 function _extends() {
   _extends = Object.assign || function (target) {
@@ -33459,75 +33903,6 @@ function _extends() {
   return _extends.apply(this, arguments);
 }
 
-function _classCallCheck(instance, Constructor) {
-  if (!(instance instanceof Constructor)) {
-    throw new TypeError("Cannot call a class as a function");
-  }
-}
-
-function _defineProperties(target, props) {
-  for (var i = 0; i < props.length; i++) {
-    var descriptor = props[i];
-    descriptor.enumerable = descriptor.enumerable || false;
-    descriptor.configurable = true;
-    if ("value" in descriptor) descriptor.writable = true;
-    Object.defineProperty(target, descriptor.key, descriptor);
-  }
-}
-
-function _createClass(Constructor, protoProps, staticProps) {
-  if (protoProps) _defineProperties(Constructor.prototype, protoProps);
-  if (staticProps) _defineProperties(Constructor, staticProps);
-  return Constructor;
-}
-
-function _possibleConstructorReturn(self, call) {
-  if (call && (_typeof(call) === "object" || typeof call === "function")) {
-    return call;
-  }
-
-  return _assertThisInitialized(self);
-}
-
-function _getPrototypeOf(o) {
-  _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf : function _getPrototypeOf(o) {
-    return o.__proto__ || Object.getPrototypeOf(o);
-  };
-  return _getPrototypeOf(o);
-}
-
-function _assertThisInitialized(self) {
-  if (self === void 0) {
-    throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
-  }
-
-  return self;
-}
-
-function _inherits(subClass, superClass) {
-  if (typeof superClass !== "function" && superClass !== null) {
-    throw new TypeError("Super expression must either be null or a function");
-  }
-
-  subClass.prototype = Object.create(superClass && superClass.prototype, {
-    constructor: {
-      value: subClass,
-      writable: true,
-      configurable: true
-    }
-  });
-  if (superClass) _setPrototypeOf(subClass, superClass);
-}
-
-function _setPrototypeOf(o, p) {
-  _setPrototypeOf = Object.setPrototypeOf || function _setPrototypeOf(o, p) {
-    o.__proto__ = p;
-    return o;
-  };
-
-  return _setPrototypeOf(o, p);
-}
-
 function _defineProperty(obj, key, value) {
   if (key in obj) {
     Object.defineProperty(obj, key, {
@@ -33545,83 +33920,51 @@ function _defineProperty(obj, key, value) {
 /** @jsx h */
 
 
-var MenuSelect =
-/*#__PURE__*/
-function (_Component) {
-  _inherits(MenuSelect, _Component);
+function MenuSelect(_ref) {
+  var cssClasses = _ref.cssClasses,
+      templateProps = _ref.templateProps,
+      items = _ref.items,
+      refine = _ref.refine;
 
-  function MenuSelect() {
-    var _getPrototypeOf2;
+  var _ref2 = (0, _utils.find)(items, function (item) {
+    return item.isRefined;
+  }) || {
+    value: ''
+  },
+      selectedValue = _ref2.value;
 
-    var _this;
-
-    _classCallCheck(this, MenuSelect);
-
-    for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
-      args[_key] = arguments[_key];
+  return (0, _preact.h)("div", {
+    className: (0, _classnames.default)(cssClasses.root, _defineProperty({}, cssClasses.noRefinementRoot, items.length === 0))
+  }, (0, _preact.h)("select", {
+    className: cssClasses.select,
+    value: selectedValue,
+    onChange: function onChange(event) {
+      refine(event.target.value);
     }
-
-    _this = _possibleConstructorReturn(this, (_getPrototypeOf2 = _getPrototypeOf(MenuSelect)).call.apply(_getPrototypeOf2, [this].concat(args)));
-
-    _defineProperty(_assertThisInitialized(_this), "handleSelectChange", function (_ref) {
-      var value = _ref.target.value;
-
-      _this.props.refine(value);
-    });
-
-    return _this;
-  }
-
-  _createClass(MenuSelect, [{
-    key: "render",
-    value: function render() {
-      var _this$props = this.props,
-          cssClasses = _this$props.cssClasses,
-          templateProps = _this$props.templateProps,
-          items = _this$props.items;
-
-      var _ref2 = (0, _utils.find)(items, function (item) {
-        return item.isRefined;
-      }) || {
-        value: ''
+  }, (0, _preact.h)(_Template.default, _extends({}, templateProps, {
+    templateKey: "defaultOption",
+    rootTagName: "option",
+    rootProps: {
+      value: '',
+      className: cssClasses.option
+    }
+  })), items.map(function (item) {
+    return (0, _preact.h)(_Template.default, _extends({}, templateProps, {
+      templateKey: "item",
+      rootTagName: "option",
+      rootProps: {
+        value: item.value,
+        className: cssClasses.option
       },
-          selectedValue = _ref2.value;
-
-      var rootClassNames = (0, _classnames.default)(cssClasses.root, _defineProperty({}, cssClasses.noRefinementRoot, items.length === 0));
-      return (0, _preact.h)("div", {
-        className: rootClassNames
-      }, (0, _preact.h)("select", {
-        className: cssClasses.select,
-        value: selectedValue,
-        onChange: this.handleSelectChange
-      }, (0, _preact.h)(_Template.default, _extends({}, templateProps, {
-        templateKey: "defaultOption",
-        rootTagName: "option",
-        rootProps: {
-          value: '',
-          className: cssClasses.option
-        }
-      })), items.map(function (item) {
-        return (0, _preact.h)(_Template.default, _extends({}, templateProps, {
-          templateKey: "item",
-          rootTagName: "option",
-          rootProps: {
-            value: item.value,
-            className: cssClasses.option
-          },
-          key: item.value,
-          data: item
-        }));
-      })));
-    }
-  }]);
-
-  return MenuSelect;
-}(_preact.Component);
+      key: item.value,
+      data: item
+    }));
+  })));
+}
 
 var _default = MenuSelect;
 exports.default = _default;
-},{"preact":"node_modules/preact/dist/preact.module.js","prop-types":"node_modules/prop-types/index.js","classnames":"node_modules/classnames/index.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js","../Template/Template":"node_modules/instantsearch.js/es/components/Template/Template.js"}],"node_modules/instantsearch.js/es/widgets/menu-select/defaultTemplates.js":[function(require,module,exports) {
+},{"preact":"node_modules/preact/dist/preact.module.js","classnames":"node_modules/classnames/index.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js","../Template/Template":"node_modules/instantsearch.js/es/components/Template/Template.js"}],"node_modules/instantsearch.js/es/widgets/menu-select/defaultTemplates.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -33846,63 +34189,111 @@ exports.default = _default;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.default = connectPoweredBy;
+exports.default = void 0;
 
 var _utils = require("../../lib/utils");
+
+function ownKeys(object, enumerableOnly) {
+  var keys = Object.keys(object);
+
+  if (Object.getOwnPropertySymbols) {
+    var symbols = Object.getOwnPropertySymbols(object);
+    if (enumerableOnly) symbols = symbols.filter(function (sym) {
+      return Object.getOwnPropertyDescriptor(object, sym).enumerable;
+    });
+    keys.push.apply(keys, symbols);
+  }
+
+  return keys;
+}
+
+function _objectSpread(target) {
+  for (var i = 1; i < arguments.length; i++) {
+    var source = arguments[i] != null ? arguments[i] : {};
+
+    if (i % 2) {
+      ownKeys(Object(source), true).forEach(function (key) {
+        _defineProperty(target, key, source[key]);
+      });
+    } else if (Object.getOwnPropertyDescriptors) {
+      Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
+    } else {
+      ownKeys(Object(source)).forEach(function (key) {
+        Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
+      });
+    }
+  }
+
+  return target;
+}
+
+function _defineProperty(obj, key, value) {
+  if (key in obj) {
+    Object.defineProperty(obj, key, {
+      value: value,
+      enumerable: true,
+      configurable: true,
+      writable: true
+    });
+  } else {
+    obj[key] = value;
+  }
+
+  return obj;
+}
 
 var withUsage = (0, _utils.createDocumentationMessageGenerator)({
   name: 'powered-by',
   connector: true
 });
 /**
- * @typedef {Object} PoweredByWidgetOptions
- * @property {string} [theme] The theme of the logo ("light" or "dark").
- * @property {string} [url] The URL to redirect to.
- */
-
-/**
- * @typedef {Object} PoweredByRenderingOptions
- * @property {Object} widgetParams All original `PoweredByWidgetOptions` forwarded to the `renderFn`.
- */
-
-/**
  * **PoweredBy** connector provides the logic to build a custom widget that will displays
  * the logo to redirect to Algolia.
- *
- * @type {Connector}
- * @param {function(PoweredByRenderingOptions, boolean)} renderFn Rendering function for the custom **PoweredBy** widget.
- * @param {function} unmountFn Unmount function called when the widget is disposed.
- * @return {function} Re-usable widget factory for a custom **PoweredBy** widget.
  */
 
-function connectPoweredBy(renderFn) {
+var connectPoweredBy = function connectPoweredBy(renderFn) {
   var unmountFn = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : _utils.noop;
   (0, _utils.checkRendering)(renderFn, withUsage());
   var defaultUrl = 'https://www.algolia.com/?' + 'utm_source=instantsearch.js&' + 'utm_medium=website&' + "utm_content=".concat(typeof window !== 'undefined' && window.location ? window.location.hostname : '', "&") + 'utm_campaign=poweredby';
-  return function () {
-    var widgetParams = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-    var _widgetParams$url = widgetParams.url,
-        url = _widgetParams$url === void 0 ? defaultUrl : _widgetParams$url;
+  return function (widgetParams) {
+    var _ref = widgetParams || {},
+        _ref$url = _ref.url,
+        url = _ref$url === void 0 ? defaultUrl : _ref$url;
+
     return {
       $$type: 'ais.poweredBy',
-      init: function init() {
-        renderFn({
-          url: url,
-          widgetParams: widgetParams
-        }, true);
+      init: function init(initOptions) {
+        var instantSearchInstance = initOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(initOptions), {
+          instantSearchInstance: instantSearchInstance
+        }), true);
       },
-      render: function render() {
-        renderFn({
+      render: function render(renderOptions) {
+        var instantSearchInstance = renderOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(renderOptions), {
+          instantSearchInstance: instantSearchInstance
+        }), false);
+      },
+      getRenderState: function getRenderState(renderState, renderOptions) {
+        return _objectSpread({}, renderState, {
+          poweredBy: this.getWidgetRenderState(renderOptions)
+        });
+      },
+      getWidgetRenderState: function getWidgetRenderState() {
+        return {
           url: url,
           widgetParams: widgetParams
-        }, false);
+        };
       },
       dispose: function dispose() {
         unmountFn();
       }
     };
   };
-}
+};
+
+var _default = connectPoweredBy;
+exports.default = _default;
 },{"../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js"}],"node_modules/instantsearch.js/es/widgets/powered-by/powered-by.js":[function(require,module,exports) {
 "use strict";
 
@@ -34015,7 +34406,184 @@ function poweredBy() {
     theme: theme
   });
 }
-},{"preact":"node_modules/preact/dist/preact.module.js","classnames":"node_modules/classnames/index.js","../../components/PoweredBy/PoweredBy":"node_modules/instantsearch.js/es/components/PoweredBy/PoweredBy.js","../../connectors/powered-by/connectPoweredBy":"node_modules/instantsearch.js/es/connectors/powered-by/connectPoweredBy.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js","../../lib/suit":"node_modules/instantsearch.js/es/lib/suit.js"}],"node_modules/instantsearch.js/es/components/Panel/Panel.js":[function(require,module,exports) {
+},{"preact":"node_modules/preact/dist/preact.module.js","classnames":"node_modules/classnames/index.js","../../components/PoweredBy/PoweredBy":"node_modules/instantsearch.js/es/components/PoweredBy/PoweredBy.js","../../connectors/powered-by/connectPoweredBy":"node_modules/instantsearch.js/es/connectors/powered-by/connectPoweredBy.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js","../../lib/suit":"node_modules/instantsearch.js/es/lib/suit.js"}],"node_modules/preact/hooks/dist/hooks.module.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.useState = l;
+exports.useReducer = p;
+exports.useEffect = y;
+exports.useLayoutEffect = h;
+exports.useRef = s;
+exports.useImperativeHandle = _;
+exports.useMemo = d;
+exports.useCallback = A;
+exports.useContext = F;
+exports.useDebugValue = T;
+exports.useErrorBoundary = q;
+
+var _preact = require("preact");
+
+var t,
+    u,
+    r,
+    o = 0,
+    i = [],
+    c = _preact.options.__b,
+    f = _preact.options.__r,
+    e = _preact.options.diffed,
+    a = _preact.options.__c,
+    v = _preact.options.unmount;
+
+function m(t, r) {
+  _preact.options.__h && _preact.options.__h(u, t, o || r), o = 0;
+  var i = u.__H || (u.__H = {
+    __: [],
+    __h: []
+  });
+  return t >= i.__.length && i.__.push({}), i.__[t];
+}
+
+function l(n) {
+  return o = 1, p(w, n);
+}
+
+function p(n, r, o) {
+  var i = m(t++, 2);
+  return i.t = n, i.__c || (i.__ = [o ? o(r) : w(void 0, r), function (n) {
+    var t = i.t(i.__[0], n);
+    i.__[0] !== t && (i.__ = [t, i.__[1]], i.__c.setState({}));
+  }], i.__c = u), i.__;
+}
+
+function y(r, o) {
+  var i = m(t++, 3);
+  !_preact.options.__s && k(i.__H, o) && (i.__ = r, i.__H = o, u.__H.__h.push(i));
+}
+
+function h(r, o) {
+  var i = m(t++, 4);
+  !_preact.options.__s && k(i.__H, o) && (i.__ = r, i.__H = o, u.__h.push(i));
+}
+
+function s(n) {
+  return o = 5, d(function () {
+    return {
+      current: n
+    };
+  }, []);
+}
+
+function _(n, t, u) {
+  o = 6, h(function () {
+    "function" == typeof n ? n(t()) : n && (n.current = t());
+  }, null == u ? u : u.concat(n));
+}
+
+function d(n, u) {
+  var r = m(t++, 7);
+  return k(r.__H, u) && (r.__ = n(), r.__H = u, r.__h = n), r.__;
+}
+
+function A(n, t) {
+  return o = 8, d(function () {
+    return n;
+  }, t);
+}
+
+function F(n) {
+  var r = u.context[n.__c],
+      o = m(t++, 9);
+  return o.__c = n, r ? (null == o.__ && (o.__ = !0, r.sub(u)), r.props.value) : n.__;
+}
+
+function T(t, u) {
+  _preact.options.useDebugValue && _preact.options.useDebugValue(u ? u(t) : t);
+}
+
+function q(n) {
+  var r = m(t++, 10),
+      o = l();
+  return r.__ = n, u.componentDidCatch || (u.componentDidCatch = function (n) {
+    r.__ && r.__(n), o[1](n);
+  }), [o[0], function () {
+    o[1](void 0);
+  }];
+}
+
+function x() {
+  i.forEach(function (t) {
+    if (t.__P) try {
+      t.__H.__h.forEach(g), t.__H.__h.forEach(j), t.__H.__h = [];
+    } catch (u) {
+      t.__H.__h = [], _preact.options.__e(u, t.__v);
+    }
+  }), i = [];
+}
+
+_preact.options.__b = function (n) {
+  u = null, c && c(n);
+}, _preact.options.__r = function (n) {
+  f && f(n), t = 0;
+  var r = (u = n.__c).__H;
+  r && (r.__h.forEach(g), r.__h.forEach(j), r.__h = []);
+}, _preact.options.diffed = function (t) {
+  e && e(t);
+  var o = t.__c;
+  o && o.__H && o.__H.__h.length && (1 !== i.push(o) && r === _preact.options.requestAnimationFrame || ((r = _preact.options.requestAnimationFrame) || function (n) {
+    var t,
+        u = function () {
+      clearTimeout(r), b && cancelAnimationFrame(t), setTimeout(n);
+    },
+        r = setTimeout(u, 100);
+
+    b && (t = requestAnimationFrame(u));
+  })(x)), u = void 0;
+}, _preact.options.__c = function (t, u) {
+  u.some(function (t) {
+    try {
+      t.__h.forEach(g), t.__h = t.__h.filter(function (n) {
+        return !n.__ || j(n);
+      });
+    } catch (r) {
+      u.some(function (n) {
+        n.__h && (n.__h = []);
+      }), u = [], _preact.options.__e(r, t.__v);
+    }
+  }), a && a(t, u);
+}, _preact.options.unmount = function (t) {
+  v && v(t);
+  var u = t.__c;
+  if (u && u.__H) try {
+    u.__H.__.forEach(g);
+  } catch (t) {
+    _preact.options.__e(t, u.__v);
+  }
+};
+var b = "function" == typeof requestAnimationFrame;
+
+function g(n) {
+  var t = u;
+  "function" == typeof n.__c && n.__c(), u = t;
+}
+
+function j(n) {
+  var t = u;
+  n.__c = n.__(), u = t;
+}
+
+function k(n, t) {
+  return !n || n.length !== t.length || t.some(function (t, u) {
+    return t !== n[u];
+  });
+}
+
+function w(n, t) {
+  return "function" == typeof t ? t(n) : t;
+}
+},{"preact":"node_modules/preact/dist/preact.module.js"}],"node_modules/instantsearch.js/es/components/Panel/Panel.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -34025,114 +34593,13 @@ exports.default = void 0;
 
 var _preact = require("preact");
 
-var _propTypes = _interopRequireDefault(require("prop-types"));
+var _hooks = require("preact/hooks");
 
 var _classnames = _interopRequireDefault(require("classnames"));
 
 var _Template = _interopRequireDefault(require("../Template/Template"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-function _typeof(obj) {
-  if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") {
-    _typeof = function _typeof(obj) {
-      return typeof obj;
-    };
-  } else {
-    _typeof = function _typeof(obj) {
-      return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj;
-    };
-  }
-
-  return _typeof(obj);
-}
-
-function _extends() {
-  _extends = Object.assign || function (target) {
-    for (var i = 1; i < arguments.length; i++) {
-      var source = arguments[i];
-
-      for (var key in source) {
-        if (Object.prototype.hasOwnProperty.call(source, key)) {
-          target[key] = source[key];
-        }
-      }
-    }
-
-    return target;
-  };
-
-  return _extends.apply(this, arguments);
-}
-
-function _classCallCheck(instance, Constructor) {
-  if (!(instance instanceof Constructor)) {
-    throw new TypeError("Cannot call a class as a function");
-  }
-}
-
-function _defineProperties(target, props) {
-  for (var i = 0; i < props.length; i++) {
-    var descriptor = props[i];
-    descriptor.enumerable = descriptor.enumerable || false;
-    descriptor.configurable = true;
-    if ("value" in descriptor) descriptor.writable = true;
-    Object.defineProperty(target, descriptor.key, descriptor);
-  }
-}
-
-function _createClass(Constructor, protoProps, staticProps) {
-  if (protoProps) _defineProperties(Constructor.prototype, protoProps);
-  if (staticProps) _defineProperties(Constructor, staticProps);
-  return Constructor;
-}
-
-function _possibleConstructorReturn(self, call) {
-  if (call && (_typeof(call) === "object" || typeof call === "function")) {
-    return call;
-  }
-
-  return _assertThisInitialized(self);
-}
-
-function _getPrototypeOf(o) {
-  _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf : function _getPrototypeOf(o) {
-    return o.__proto__ || Object.getPrototypeOf(o);
-  };
-  return _getPrototypeOf(o);
-}
-
-function _assertThisInitialized(self) {
-  if (self === void 0) {
-    throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
-  }
-
-  return self;
-}
-
-function _inherits(subClass, superClass) {
-  if (typeof superClass !== "function" && superClass !== null) {
-    throw new TypeError("Super expression must either be null or a function");
-  }
-
-  subClass.prototype = Object.create(superClass && superClass.prototype, {
-    constructor: {
-      value: subClass,
-      writable: true,
-      configurable: true
-    }
-  });
-  if (superClass) _setPrototypeOf(subClass, superClass);
-}
-
-function _setPrototypeOf(o, p) {
-  _setPrototypeOf = Object.setPrototypeOf || function _setPrototypeOf(o, p) {
-    o.__proto__ = p;
-    return o;
-  };
-
-  return _setPrototypeOf(o, p);
-}
 
 function _defineProperty(obj, key, value) {
   if (key in obj) {
@@ -34148,118 +34615,129 @@ function _defineProperty(obj, key, value) {
 
   return obj;
 }
+
+function _slicedToArray(arr, i) {
+  return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _nonIterableRest();
+}
+
+function _nonIterableRest() {
+  throw new TypeError("Invalid attempt to destructure non-iterable instance");
+}
+
+function _iterableToArrayLimit(arr, i) {
+  if (!(Symbol.iterator in Object(arr) || Object.prototype.toString.call(arr) === "[object Arguments]")) {
+    return;
+  }
+
+  var _arr = [];
+  var _n = true;
+  var _d = false;
+  var _e = undefined;
+
+  try {
+    for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) {
+      _arr.push(_s.value);
+
+      if (i && _arr.length === i) break;
+    }
+  } catch (err) {
+    _d = true;
+    _e = err;
+  } finally {
+    try {
+      if (!_n && _i["return"] != null) _i["return"]();
+    } finally {
+      if (_d) throw _e;
+    }
+  }
+
+  return _arr;
+}
+
+function _arrayWithHoles(arr) {
+  if (Array.isArray(arr)) return arr;
+}
 /** @jsx h */
 
 
-var Panel =
-/*#__PURE__*/
-function (_Component) {
-  _inherits(Panel, _Component);
+function Panel(props) {
+  var _cx;
 
-  function Panel() {
-    var _getPrototypeOf2;
+  var _useState = (0, _hooks.useState)(props.isCollapsed),
+      _useState2 = _slicedToArray(_useState, 2),
+      isCollapsed = _useState2[0],
+      setIsCollapsed = _useState2[1];
 
-    var _this;
+  var _useState3 = (0, _hooks.useState)(false),
+      _useState4 = _slicedToArray(_useState3, 2),
+      isControlled = _useState4[0],
+      setIsControlled = _useState4[1];
 
-    _classCallCheck(this, Panel);
-
-    for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
-      args[_key] = arguments[_key];
+  var bodyRef = (0, _hooks.useRef)(null);
+  (0, _hooks.useEffect)(function () {
+    if (!bodyRef.current) {
+      return undefined;
     }
 
-    _this = _possibleConstructorReturn(this, (_getPrototypeOf2 = _getPrototypeOf(Panel)).call.apply(_getPrototypeOf2, [this].concat(args)));
+    bodyRef.current.appendChild(props.bodyElement);
+    return function () {
+      bodyRef.current.removeChild(props.bodyElement);
+    };
+  }, [bodyRef, props.bodyElement]);
 
-    _defineProperty(_assertThisInitialized(_this), "state", {
-      collapsed: _this.props.collapsed,
-      controlled: false
-    });
-
-    return _this;
+  if (!isControlled && props.isCollapsed !== isCollapsed) {
+    setIsCollapsed(props.isCollapsed);
   }
 
-  _createClass(Panel, [{
-    key: "componentDidMount",
-    value: function componentDidMount() {
-      this.bodyRef.appendChild(this.props.bodyElement);
+  return (0, _preact.h)("div", {
+    className: (0, _classnames.default)(props.cssClasses.root, (_cx = {}, _defineProperty(_cx, props.cssClasses.noRefinementRoot, props.hidden), _defineProperty(_cx, props.cssClasses.collapsibleRoot, props.collapsible), _defineProperty(_cx, props.cssClasses.collapsedRoot, isCollapsed), _cx)),
+    hidden: props.hidden
+  }, props.templates.header && (0, _preact.h)("div", {
+    className: props.cssClasses.header
+  }, (0, _preact.h)(_Template.default, {
+    templates: props.templates,
+    templateKey: "header",
+    rootTagName: "span",
+    data: props.data
+  }), props.collapsible && (0, _preact.h)("button", {
+    className: props.cssClasses.collapseButton,
+    "aria-expanded": !isCollapsed,
+    onClick: function onClick(event) {
+      event.preventDefault();
+      setIsControlled(true);
+      setIsCollapsed(function (prevIsCollapsed) {
+        return !prevIsCollapsed;
+      });
     }
-  }, {
-    key: "render",
-    value: function render() {
-      var _cx,
-          _this2 = this;
-
-      var _this$props = this.props,
-          cssClasses = _this$props.cssClasses,
-          hidden = _this$props.hidden,
-          collapsible = _this$props.collapsible,
-          templateProps = _this$props.templateProps,
-          data = _this$props.data;
-      return (0, _preact.h)("div", {
-        className: (0, _classnames.default)(cssClasses.root, (_cx = {}, _defineProperty(_cx, cssClasses.noRefinementRoot, hidden), _defineProperty(_cx, cssClasses.collapsibleRoot, collapsible), _defineProperty(_cx, cssClasses.collapsedRoot, this.state.collapsed), _cx)),
-        hidden: hidden
-      }, templateProps.templates.header && (0, _preact.h)("div", {
-        className: cssClasses.header
-      }, (0, _preact.h)(_Template.default, _extends({}, templateProps, {
-        templateKey: "header",
-        rootTagName: "span",
-        data: data
-      })), collapsible && (0, _preact.h)("button", {
-        className: cssClasses.collapseButton,
-        "aria-expanded": !this.state.collapsed,
-        onClick: function onClick(event) {
-          event.preventDefault();
-
-          _this2.setState(function (previousState) {
-            return {
-              controlled: true,
-              collapsed: !previousState.collapsed
-            };
-          });
-        }
-      }, (0, _preact.h)(_Template.default, _extends({}, templateProps, {
-        templateKey: "collapseButtonText",
-        rootTagName: "span",
-        data: {
-          collapsed: this.state.collapsed
-        }
-      })))), (0, _preact.h)("div", {
-        className: cssClasses.body,
-        ref: function ref(node) {
-          return _this2.bodyRef = node;
-        }
-      }), templateProps.templates.footer && (0, _preact.h)(_Template.default, _extends({}, templateProps, {
-        templateKey: "footer",
-        rootProps: {
-          className: cssClasses.footer
-        },
-        data: data
-      })));
+  }, (0, _preact.h)(_Template.default, {
+    templates: props.templates,
+    templateKey: "collapseButtonText",
+    rootTagName: "span",
+    data: {
+      collapsed: isCollapsed
     }
-  }], [{
-    key: "getDerivedStateFromProps",
-    value: function getDerivedStateFromProps(nextProps, prevState) {
-      if (!prevState.controlled && nextProps.collapsed !== prevState.collapsed) {
-        return {
-          collapsed: nextProps.collapsed
-        };
-      }
-
-      return null;
-    }
-  }]);
-
-  return Panel;
-}(_preact.Component);
+  }))), (0, _preact.h)("div", {
+    className: props.cssClasses.body,
+    ref: bodyRef
+  }), props.templates.footer && (0, _preact.h)(_Template.default, {
+    templates: props.templates,
+    templateKey: "footer",
+    rootProps: {
+      className: props.cssClasses.footer
+    },
+    data: props.data
+  }));
+}
 
 var _default = Panel;
 exports.default = _default;
-},{"preact":"node_modules/preact/dist/preact.module.js","prop-types":"node_modules/prop-types/index.js","classnames":"node_modules/classnames/index.js","../Template/Template":"node_modules/instantsearch.js/es/components/Template/Template.js"}],"node_modules/instantsearch.js/es/widgets/panel/panel.js":[function(require,module,exports) {
+},{"preact":"node_modules/preact/dist/preact.module.js","preact/hooks":"node_modules/preact/hooks/dist/hooks.module.js","classnames":"node_modules/classnames/index.js","../Template/Template":"node_modules/instantsearch.js/es/components/Template/Template.js"}],"node_modules/instantsearch.js/es/widgets/panel/panel.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.default = panel;
+exports.default = void 0;
 
 var _preact = require("preact");
 
@@ -34292,13 +34770,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -34321,20 +34799,6 @@ function _defineProperty(obj, key, value) {
 
   return obj;
 }
-
-function _typeof(obj) {
-  if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") {
-    _typeof = function _typeof(obj) {
-      return typeof obj;
-    };
-  } else {
-    _typeof = function _typeof(obj) {
-      return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj;
-    };
-  }
-
-  return _typeof(obj);
-}
 /** @jsx h */
 
 
@@ -34347,7 +34811,7 @@ var renderer = function renderer(_ref) {
   var containerNode = _ref.containerNode,
       bodyContainerNode = _ref.bodyContainerNode,
       cssClasses = _ref.cssClasses,
-      templateProps = _ref.templateProps;
+      templates = _ref.templates;
   return function (_ref2) {
     var options = _ref2.options,
         hidden = _ref2.hidden,
@@ -34357,65 +34821,21 @@ var renderer = function renderer(_ref) {
       cssClasses: cssClasses,
       hidden: hidden,
       collapsible: collapsible,
-      collapsed: collapsed,
-      templateProps: templateProps,
+      isCollapsed: collapsed,
+      templates: templates,
       data: options,
       bodyElement: bodyContainerNode
     }), containerNode);
   };
 };
 /**
- * @typedef {Object} PanelWidgetCSSClasses
- * @property  {string|string[]} [root] CSS classes added to the root element of the widget.
- * @property  {string|string[]} [noRefinementRoot] CSS classes added to the root element of the widget when there's no refinements.
- * @property  {string|string[]} [collapsibleRoot] CSS classes added to the root element when collapsible.
- * @property  {string|string[]} [collapsedRoot] CSS classes added to the root element when collapsed.
- * @property  {string|string[]} [collapseButton] CSS classes added to the collapse button element.
- * @property  {string|string[]} [collapseIcon] CSS classes added to the collapse icon of the button.
- * @property  {string|string[]} [header] CSS class to add to the header.
- * @property  {string|string[]} [footer] CSS class to add to the SVG footer.
- */
-
-/**
- * @typedef {Object} PanelTemplates
- * @property {string|function} [header = ''] Template to use for the header.
- * @property {string|function} [footer = ''] Template to use for the footer.
- * @property {string|function} [collapseButtonText] Template to use for collapse button. It is given the collapsed state.
- */
-
-/**
- * @typedef {Object} PanelWidgetOptions
- * @property {function} [hidden] This function is called on each render to determine from the render options if the panel have to be hidden or not. If the value is `true` the CSS class `noRefinementRoot` is applied and the wrapper is hidden.
- * @property {PanelTemplates} [templates] Templates to use for the widgets.
- * @property {PanelWidgetCSSClasses} [cssClasses] CSS classes to add.
- */
-
-/**
- * The panel widget wraps other widgets in a consistent panel design. It also reacts, indicates and sets CSS classes when widgets are no more relevant for refining.
- *
- * @type {WidgetFactory}
- * @devNovel Panel
- * @category metadata
- * @param {PanelWidgetOptions} $0 Panel widget options.
- * @return {function} A new panel widget instance
- * @example
- * const refinementListWithPanel = instantsearch.widgets.panel({
- *   templates: {
- *     header: 'Brand',
- *   },
- * })(instantsearch.widgets.refinementList);
- *
- * search.addWidgets([
- *   refinementListWithPanel({
- *     container: '#refinement-list',
- *     attribute: 'brand',
- *   })
- * ]);
+ * The panel widget wraps other widgets in a consistent panel design.
+ * It also reacts, indicates and sets CSS classes when widgets are no longer relevant for refining.
  */
 
 
-function panel() {
-  var _ref3 = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {},
+var panel = function panel(widgetParams) {
+  var _ref3 = widgetParams || {},
       _ref3$templates = _ref3.templates,
       templates = _ref3$templates === void 0 ? {} : _ref3$templates,
       _ref3$hidden = _ref3.hidden,
@@ -34426,8 +34846,8 @@ function panel() {
       _ref3$cssClasses = _ref3.cssClasses,
       userCssClasses = _ref3$cssClasses === void 0 ? {} : _ref3$cssClasses;
 
-  "development" === 'development' ? (0, _utils.warning)(typeof hidden === 'function', "The `hidden` option in the \"panel\" widget expects a function returning a boolean (received \"".concat(_typeof(hidden), "\" type).")) : void 0;
-  "development" === 'development' ? (0, _utils.warning)(typeof collapsed === 'undefined' || typeof collapsed === 'function', "The `collapsed` option in the \"panel\" widget expects a function returning a boolean (received \"".concat(_typeof(collapsed), "\" type).")) : void 0;
+  "development" === 'development' ? (0, _utils.warning)(typeof hidden === 'function', "The `hidden` option in the \"panel\" widget expects a function returning a boolean (received type ".concat((0, _utils.getObjectType)(hidden), ").")) : void 0;
+  "development" === 'development' ? (0, _utils.warning)(typeof collapsed === 'undefined' || typeof collapsed === 'function', "The `collapsed` option in the \"panel\" widget expects a function returning a boolean (received type ".concat((0, _utils.getObjectType)(collapsed), ").")) : void 0;
   var bodyContainerNode = document.createElement('div');
   var collapsible = Boolean(collapsed);
   var collapsedFn = typeof collapsed === 'function' ? collapsed : function () {
@@ -34461,9 +34881,9 @@ function panel() {
     }), userCssClasses.footer)
   };
   return function (widgetFactory) {
-    return function () {
-      var widgetOptions = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-      var container = widgetOptions.container;
+    return function (widgetOptions) {
+      var _ref4 = widgetOptions || {},
+          container = _ref4.container;
 
       if (!container) {
         throw new Error(withUsage("The `container` option is required in the widget within the panel."));
@@ -34472,20 +34892,16 @@ function panel() {
       var defaultTemplates = {
         header: '',
         footer: '',
-        collapseButtonText: function collapseButtonText(_ref4) {
-          var isCollapsed = _ref4.collapsed;
+        collapseButtonText: function collapseButtonText(_ref5) {
+          var isCollapsed = _ref5.collapsed;
           return "<svg\n          class=\"".concat(cssClasses.collapseIcon, "\"\n          width=\"1em\"\n          height=\"1em\"\n          viewBox=\"0 0 500 500\"\n        >\n        <path d=\"").concat(isCollapsed ? 'M100 250l300-150v300z' : 'M250 400l150-300H100z', "\" fill=\"currentColor\" />\n        </svg>");
         }
       };
-      var templateProps = (0, _utils.prepareTemplateProps)({
-        defaultTemplates: defaultTemplates,
-        templates: templates
-      });
       var renderPanel = renderer({
         containerNode: (0, _utils.getContainerNode)(container),
         bodyContainerNode: bodyContainerNode,
         cssClasses: cssClasses,
-        templateProps: templateProps
+        templates: _objectSpread({}, defaultTemplates, {}, templates)
       });
       renderPanel({
         options: {},
@@ -34517,7 +34933,10 @@ function panel() {
             args[_key2] = arguments[_key2];
           }
 
-          var options = args[0];
+          var renderOptions = args[0];
+
+          var options = _objectSpread({}, widget.getWidgetRenderState ? widget.getWidgetRenderState(renderOptions) : {}, {}, renderOptions);
+
           renderPanel({
             options: options,
             hidden: Boolean(hidden(options)),
@@ -34534,14 +34953,17 @@ function panel() {
       });
     };
   };
-}
+};
+
+var _default = panel;
+exports.default = _default;
 },{"preact":"node_modules/preact/dist/preact.module.js","classnames":"node_modules/classnames/index.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js","../../lib/suit":"node_modules/instantsearch.js/es/lib/suit.js","../../components/Panel/Panel":"node_modules/instantsearch.js/es/components/Panel/Panel.js"}],"node_modules/instantsearch.js/es/lib/voiceSearchHelper/index.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.default = createVoiceSearchHelper;
+exports.default = void 0;
 
 function ownKeys(object, enumerableOnly) {
   var keys = Object.keys(object);
@@ -34562,13 +34984,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -34592,7 +35014,7 @@ function _defineProperty(obj, key, value) {
   return obj;
 }
 
-function createVoiceSearchHelper(_ref) {
+var createVoiceSearchHelper = function createVoiceSearchHelper(_ref) {
   var searchAsYouSpeak = _ref.searchAsYouSpeak,
       language = _ref.language,
       onQueryChange = _ref.onQueryChange,
@@ -34671,7 +35093,7 @@ function createVoiceSearchHelper(_ref) {
     }
   };
 
-  var start = function start() {
+  var startListening = function startListening() {
     recognition = new SpeechRecognitionAPI();
 
     if (!recognition) {
@@ -34705,7 +35127,7 @@ function createVoiceSearchHelper(_ref) {
     recognition = undefined;
   };
 
-  var stop = function stop() {
+  var stopListening = function stopListening() {
     dispose(); // Because `dispose` removes event listeners, `end` listener is not called.
     // So we're setting the `status` as `finished` here.
     // If we don't do it, it will be still `waiting` or `recognizing`.
@@ -34713,26 +35135,18 @@ function createVoiceSearchHelper(_ref) {
     resetState('finished');
   };
 
-  var toggleListening = function toggleListening() {
-    if (!isBrowserSupported()) {
-      return;
-    }
-
-    if (isListening()) {
-      stop();
-    } else {
-      start();
-    }
-  };
-
   return {
     getState: getState,
     isBrowserSupported: isBrowserSupported,
     isListening: isListening,
-    toggleListening: toggleListening,
+    startListening: startListening,
+    stopListening: stopListening,
     dispose: dispose
   };
-}
+};
+
+var _default = createVoiceSearchHelper;
+exports.default = _default;
 },{}],"node_modules/instantsearch.js/es/connectors/voice-search/connectVoiceSearch.js":[function(require,module,exports) {
 "use strict";
 
@@ -34743,7 +35157,7 @@ exports.default = void 0;
 
 var _utils = require("../../lib/utils");
 
-var _voiceSearchHelper = _interopRequireDefault(require("../../lib/voiceSearchHelper"));
+var _voiceSearchHelper2 = _interopRequireDefault(require("../../lib/voiceSearchHelper"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -34766,13 +35180,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -34805,88 +35219,100 @@ var connectVoiceSearch = function connectVoiceSearch(renderFn) {
   var unmountFn = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : _utils.noop;
   (0, _utils.checkRendering)(renderFn, withUsage());
   return function (widgetParams) {
-    var _render = function render(_ref) {
-      var isFirstRendering = _ref.isFirstRendering,
-          instantSearchInstance = _ref.instantSearchInstance,
-          _ref$voiceSearchHelpe = _ref.voiceSearchHelper,
-          isBrowserSupported = _ref$voiceSearchHelpe.isBrowserSupported,
-          isListening = _ref$voiceSearchHelpe.isListening,
-          toggleListening = _ref$voiceSearchHelpe.toggleListening,
-          getState = _ref$voiceSearchHelpe.getState;
-      renderFn({
-        isBrowserSupported: isBrowserSupported(),
-        isListening: isListening(),
-        toggleListening: toggleListening,
-        voiceListeningState: getState(),
-        widgetParams: widgetParams,
-        instantSearchInstance: instantSearchInstance
-      }, isFirstRendering);
-    };
-
     var _widgetParams$searchA = widgetParams.searchAsYouSpeak,
         searchAsYouSpeak = _widgetParams$searchA === void 0 ? false : _widgetParams$searchA,
         language = widgetParams.language,
-        additionalQueryParameters = widgetParams.additionalQueryParameters;
+        additionalQueryParameters = widgetParams.additionalQueryParameters,
+        _widgetParams$createV = widgetParams.createVoiceSearchHelper,
+        createVoiceSearchHelper = _widgetParams$createV === void 0 ? _voiceSearchHelper2.default : _widgetParams$createV;
     return {
       $$type: 'ais.voiceSearch',
-      init: function init(_ref2) {
+      init: function init(initOptions) {
+        var instantSearchInstance = initOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(initOptions), {
+          instantSearchInstance: instantSearchInstance
+        }), true);
+      },
+      render: function render(renderOptions) {
+        var instantSearchInstance = renderOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(renderOptions), {
+          instantSearchInstance: instantSearchInstance
+        }), false);
+      },
+      getRenderState: function getRenderState(renderState, renderOptions) {
+        return _objectSpread({}, renderState, {
+          voiceSearch: this.getWidgetRenderState(renderOptions)
+        });
+      },
+      getWidgetRenderState: function getWidgetRenderState(renderOptions) {
         var _this = this;
 
-        var helper = _ref2.helper,
-            instantSearchInstance = _ref2.instantSearchInstance;
+        var helper = renderOptions.helper,
+            instantSearchInstance = renderOptions.instantSearchInstance;
 
-        this._refine = function (query) {
-          if (query !== helper.state.query) {
-            var queryLanguages = language ? [language.split('-')[0]] : undefined;
-            helper.setQueryParameter('queryLanguages', queryLanguages);
+        if (!this._refine) {
+          this._refine = function (query) {
+            if (query !== helper.state.query) {
+              var queryLanguages = language ? [language.split('-')[0]] : undefined;
+              helper.setQueryParameter('queryLanguages', queryLanguages);
 
-            if (typeof additionalQueryParameters === 'function') {
-              helper.setState(helper.state.setQueryParameters(_objectSpread({
-                ignorePlurals: true,
-                removeStopWords: true,
-                // @ts-ignore (optionalWords only allows array, while string is also valid)
-                optionalWords: query
-              }, additionalQueryParameters({
-                query: query
-              }))));
+              if (typeof additionalQueryParameters === 'function') {
+                helper.setState(helper.state.setQueryParameters(_objectSpread({
+                  ignorePlurals: true,
+                  removeStopWords: true,
+                  // @ts-ignore (optionalWords only allows array, while string is also valid)
+                  optionalWords: query
+                }, additionalQueryParameters({
+                  query: query
+                }))));
+              }
+
+              helper.setQuery(query).search();
+            }
+          };
+        }
+
+        if (!this._voiceSearchHelper) {
+          this._voiceSearchHelper = createVoiceSearchHelper({
+            searchAsYouSpeak: searchAsYouSpeak,
+            language: language,
+            onQueryChange: function onQueryChange(query) {
+              return _this._refine(query);
+            },
+            onStateChange: function onStateChange() {
+              renderFn(_objectSpread({}, _this.getWidgetRenderState(renderOptions), {
+                instantSearchInstance: instantSearchInstance
+              }), false);
+            }
+          });
+        }
+
+        var _voiceSearchHelper = this._voiceSearchHelper,
+            isBrowserSupported = _voiceSearchHelper.isBrowserSupported,
+            isListening = _voiceSearchHelper.isListening,
+            startListening = _voiceSearchHelper.startListening,
+            stopListening = _voiceSearchHelper.stopListening,
+            getState = _voiceSearchHelper.getState;
+        return {
+          isBrowserSupported: isBrowserSupported(),
+          isListening: isListening(),
+          toggleListening: function toggleListening() {
+            if (!isBrowserSupported()) {
+              return;
             }
 
-            helper.setQuery(query).search();
-          }
-        };
-
-        this._voiceSearchHelper = (0, _voiceSearchHelper.default)({
-          searchAsYouSpeak: searchAsYouSpeak,
-          language: language,
-          onQueryChange: function onQueryChange(query) {
-            return _this._refine(query);
+            if (isListening()) {
+              stopListening();
+            } else {
+              startListening();
+            }
           },
-          onStateChange: function onStateChange() {
-            _render({
-              isFirstRendering: false,
-              instantSearchInstance: instantSearchInstance,
-              voiceSearchHelper: _this._voiceSearchHelper
-            });
-          }
-        });
-
-        _render({
-          isFirstRendering: true,
-          instantSearchInstance: instantSearchInstance,
-          voiceSearchHelper: this._voiceSearchHelper
-        });
+          voiceListeningState: getState(),
+          widgetParams: widgetParams
+        };
       },
-      render: function render(_ref3) {
-        var instantSearchInstance = _ref3.instantSearchInstance;
-
-        _render({
-          isFirstRendering: false,
-          instantSearchInstance: instantSearchInstance,
-          voiceSearchHelper: this._voiceSearchHelper
-        });
-      },
-      dispose: function dispose(_ref4) {
-        var state = _ref4.state;
+      dispose: function dispose(_ref) {
+        var state = _ref.state;
 
         this._voiceSearchHelper.dispose();
 
@@ -34912,8 +35338,8 @@ var connectVoiceSearch = function connectVoiceSearch(renderFn) {
 
         return newState.setQueryParameter('query', undefined);
       },
-      getWidgetState: function getWidgetState(uiState, _ref5) {
-        var searchParameters = _ref5.searchParameters;
+      getWidgetUiState: function getWidgetUiState(uiState, _ref2) {
+        var searchParameters = _ref2.searchParameters;
         var query = searchParameters.query || '';
 
         if (!query) {
@@ -34924,8 +35350,8 @@ var connectVoiceSearch = function connectVoiceSearch(renderFn) {
           query: query
         });
       },
-      getWidgetSearchParameters: function getWidgetSearchParameters(searchParameters, _ref6) {
-        var uiState = _ref6.uiState;
+      getWidgetSearchParameters: function getWidgetSearchParameters(searchParameters, _ref3) {
+        var uiState = _ref3.uiState;
         return searchParameters.setQueryParameter('query', uiState.query || '');
       }
     };
@@ -35075,13 +35501,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -35140,7 +35566,8 @@ var voiceSearch = function voiceSearch() {
       _ref2$searchAsYouSpea = _ref2.searchAsYouSpeak,
       searchAsYouSpeak = _ref2$searchAsYouSpea === void 0 ? false : _ref2$searchAsYouSpea,
       language = _ref2.language,
-      additionalQueryParameters = _ref2.additionalQueryParameters;
+      additionalQueryParameters = _ref2.additionalQueryParameters,
+      createVoiceSearchHelper = _ref2.createVoiceSearchHelper;
 
   if (!container) {
     throw new Error(withUsage('The `container` option is required.'));
@@ -35165,7 +35592,8 @@ var voiceSearch = function voiceSearch() {
     templates: _objectSpread({}, _defaultTemplates.default, {}, templates),
     searchAsYouSpeak: searchAsYouSpeak,
     language: language,
-    additionalQueryParameters: additionalQueryParameters
+    additionalQueryParameters: additionalQueryParameters,
+    createVoiceSearchHelper: createVoiceSearchHelper
   });
 };
 
@@ -35200,13 +35628,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -35315,9 +35743,9 @@ function applyRuleContexts(event) {
   }
 }
 
-var connectQueryRules = function connectQueryRules(render) {
+var connectQueryRules = function connectQueryRules(_render) {
   var unmount = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : _utils.noop;
-  (0, _utils.checkRendering)(render, withUsage());
+  (0, _utils.checkRendering)(_render, withUsage());
   return function (widgetParams) {
     var _ref2 = widgetParams || {},
         _ref2$trackedFilters = _ref2.trackedFilters,
@@ -35343,10 +35771,10 @@ var connectQueryRules = function connectQueryRules(render) {
     var onHelperChange;
     return {
       $$type: 'ais.queryRules',
-      init: function init(_ref3) {
-        var helper = _ref3.helper,
-            state = _ref3.state,
-            instantSearchInstance = _ref3.instantSearchInstance;
+      init: function init(initOptions) {
+        var helper = initOptions.helper,
+            state = initOptions.state,
+            instantSearchInstance = initOptions.instantSearchInstance;
         initialRuleContexts = state.ruleContexts || [];
         onHelperChange = applyRuleContexts.bind({
           helper: helper,
@@ -35371,34 +35799,35 @@ var connectQueryRules = function connectQueryRules(render) {
           helper.on('change', onHelperChange);
         }
 
-        render({
-          items: [],
-          instantSearchInstance: instantSearchInstance,
-          widgetParams: widgetParams
-        }, true);
+        _render(_objectSpread({}, this.getWidgetRenderState(initOptions), {
+          instantSearchInstance: instantSearchInstance
+        }), true);
       },
-      render: function (_render) {
-        function render(_x) {
-          return _render.apply(this, arguments);
-        }
+      render: function render(renderOptions) {
+        var instantSearchInstance = renderOptions.instantSearchInstance;
 
-        render.toString = function () {
-          return _render.toString();
-        };
+        _render(_objectSpread({}, this.getWidgetRenderState(renderOptions), {
+          instantSearchInstance: instantSearchInstance
+        }), false);
+      },
+      getWidgetRenderState: function getWidgetRenderState(_ref3) {
+        var results = _ref3.results;
 
-        return render;
-      }(function (_ref4) {
-        var results = _ref4.results,
-            instantSearchInstance = _ref4.instantSearchInstance;
-        var _results$userData = results.userData,
-            userData = _results$userData === void 0 ? [] : _results$userData;
+        var _ref4 = results || {},
+            _ref4$userData = _ref4.userData,
+            userData = _ref4$userData === void 0 ? [] : _ref4$userData;
+
         var items = transformItems(userData);
-        render({
+        return {
           items: items,
-          instantSearchInstance: instantSearchInstance,
           widgetParams: widgetParams
-        }, false);
-      }),
+        };
+      },
+      getRenderState: function getRenderState(renderState, renderOptions) {
+        return _objectSpread({}, renderState, {
+          queryRules: this.getWidgetRenderState(renderOptions)
+        });
+      },
       dispose: function dispose(_ref5) {
         var helper = _ref5.helper,
             state = _ref5.state;
@@ -35491,13 +35920,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -35573,11 +36002,13 @@ var queryRuleCustomData = function queryRuleCustomData() {
   var makeQueryRuleCustomData = (0, _connectQueryRules.default)(renderer, function () {
     (0, _preact.render)(null, containerNode);
   });
-  return makeQueryRuleCustomData({
+  return _objectSpread({}, makeQueryRuleCustomData({
     container: containerNode,
     cssClasses: cssClasses,
     templates: templates,
     transformItems: transformItems
+  }), {
+    $$type: 'ais.queryRuleCustomData'
   });
 };
 
@@ -35597,22 +36028,68 @@ var _connectQueryRules = _interopRequireDefault(require("../../connectors/query-
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+function ownKeys(object, enumerableOnly) {
+  var keys = Object.keys(object);
+
+  if (Object.getOwnPropertySymbols) {
+    var symbols = Object.getOwnPropertySymbols(object);
+    if (enumerableOnly) symbols = symbols.filter(function (sym) {
+      return Object.getOwnPropertyDescriptor(object, sym).enumerable;
+    });
+    keys.push.apply(keys, symbols);
+  }
+
+  return keys;
+}
+
+function _objectSpread(target) {
+  for (var i = 1; i < arguments.length; i++) {
+    var source = arguments[i] != null ? arguments[i] : {};
+
+    if (i % 2) {
+      ownKeys(Object(source), true).forEach(function (key) {
+        _defineProperty(target, key, source[key]);
+      });
+    } else if (Object.getOwnPropertyDescriptors) {
+      Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
+    } else {
+      ownKeys(Object(source)).forEach(function (key) {
+        Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
+      });
+    }
+  }
+
+  return target;
+}
+
+function _defineProperty(obj, key, value) {
+  if (key in obj) {
+    Object.defineProperty(obj, key, {
+      value: value,
+      enumerable: true,
+      configurable: true,
+      writable: true
+    });
+  } else {
+    obj[key] = value;
+  }
+
+  return obj;
+}
+
 var withUsage = (0, _utils.createDocumentationMessageGenerator)({
   name: 'query-rule-context'
 });
 
 var queryRuleContext = function queryRuleContext() {
-  var _ref = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {},
-      trackedFilters = _ref.trackedFilters,
-      transformRuleContexts = _ref.transformRuleContexts;
+  var widgetParams = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
 
-  if (!trackedFilters) {
+  if (!widgetParams.trackedFilters) {
     throw new Error(withUsage('The `trackedFilters` option is required.'));
   }
 
-  return (0, _connectQueryRules.default)(_utils.noop)({
-    trackedFilters: trackedFilters,
-    transformRuleContexts: transformRuleContexts
+  return _objectSpread({}, (0, _connectQueryRules.default)(_utils.noop)(widgetParams), {
+    $$type: 'ais.queryRuleContext'
   });
 };
 
@@ -35645,13 +36122,13 @@ function _objectSpread(target) {
     var source = arguments[i] != null ? arguments[i] : {};
 
     if (i % 2) {
-      ownKeys(source, true).forEach(function (key) {
+      ownKeys(Object(source), true).forEach(function (key) {
         _defineProperty(target, key, source[key]);
       });
     } else if (Object.getOwnPropertyDescriptors) {
       Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
     } else {
-      ownKeys(source).forEach(function (key) {
+      ownKeys(Object(source)).forEach(function (key) {
         Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
       });
     }
@@ -35716,10 +36193,9 @@ function _objectWithoutPropertiesLoose(source, excluded) {
  */
 
 
-var placesWidget = function placesWidget(widgetOptions) {
-  var _ref = widgetOptions || {},
-      _ref$placesReference = _ref.placesReference,
-      placesReference = _ref$placesReference === void 0 ? undefined : _ref$placesReference,
+var placesWidget = function placesWidget(widgetParams) {
+  var _ref = widgetParams || {},
+      placesReference = _ref.placesReference,
       _ref$defaultPosition = _ref.defaultPosition,
       defaultPosition = _ref$defaultPosition === void 0 ? [] : _ref$defaultPosition,
       placesOptions = _objectWithoutProperties(_ref, ["placesReference", "defaultPosition"]);
@@ -35760,7 +36236,7 @@ var placesWidget = function placesWidget(widgetOptions) {
         helper.search();
       });
     },
-    getWidgetState: function getWidgetState(uiState, _ref3) {
+    getWidgetUiState: function getWidgetUiState(uiState, _ref3) {
       var searchParameters = _ref3.searchParameters;
       var position = searchParameters.aroundLatLng || defaultPosition.join(',');
       var hasPositionSet = position !== defaultPosition.join(',');
@@ -35798,6 +36274,16 @@ var placesWidget = function placesWidget(widgetOptions) {
       placesAutocomplete.setVal(query);
       placesAutocomplete.close();
       return searchParameters.setQueryParameter('insideBoundingBox', undefined).setQueryParameter('aroundLatLngViaIP', false).setQueryParameter('aroundLatLng', position || undefined);
+    },
+    getRenderState: function getRenderState(renderState, renderOptions) {
+      return _objectSpread({}, renderState, {
+        places: this.getWidgetRenderState(renderOptions)
+      });
+    },
+    getWidgetRenderState: function getWidgetRenderState() {
+      return {
+        widgetParams: widgetParams
+      };
     }
   };
 };
@@ -35820,6 +36306,12 @@ Object.defineProperty(exports, "configure", {
   enumerable: true,
   get: function () {
     return _configure.default;
+  }
+});
+Object.defineProperty(exports, "EXPERIMENTAL_configureRelatedItems", {
+  enumerable: true,
+  get: function () {
+    return _configureRelatedItems.default;
   }
 });
 Object.defineProperty(exports, "currentRefinements", {
@@ -35989,6 +36481,8 @@ var _clearRefinements = _interopRequireDefault(require("./clear-refinements/clea
 
 var _configure = _interopRequireDefault(require("./configure/configure"));
 
+var _configureRelatedItems = _interopRequireDefault(require("./configure-related-items/configure-related-items"));
+
 var _currentRefinements = _interopRequireDefault(require("./current-refinements/current-refinements"));
 
 var _geoSearch = _interopRequireDefault(require("./geo-search/geo-search"));
@@ -36044,7 +36538,7 @@ var _index = _interopRequireDefault(require("./index/index"));
 var _places = _interopRequireDefault(require("./places/places"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-},{"./clear-refinements/clear-refinements":"node_modules/instantsearch.js/es/widgets/clear-refinements/clear-refinements.js","./configure/configure":"node_modules/instantsearch.js/es/widgets/configure/configure.js","./current-refinements/current-refinements":"node_modules/instantsearch.js/es/widgets/current-refinements/current-refinements.js","./geo-search/geo-search":"node_modules/instantsearch.js/es/widgets/geo-search/geo-search.js","./hierarchical-menu/hierarchical-menu":"node_modules/instantsearch.js/es/widgets/hierarchical-menu/hierarchical-menu.js","./hits/hits":"node_modules/instantsearch.js/es/widgets/hits/hits.js","./hits-per-page/hits-per-page":"node_modules/instantsearch.js/es/widgets/hits-per-page/hits-per-page.js","./infinite-hits/infinite-hits":"node_modules/instantsearch.js/es/widgets/infinite-hits/infinite-hits.js","./menu/menu":"node_modules/instantsearch.js/es/widgets/menu/menu.js","./refinement-list/refinement-list":"node_modules/instantsearch.js/es/widgets/refinement-list/refinement-list.js","./numeric-menu/numeric-menu":"node_modules/instantsearch.js/es/widgets/numeric-menu/numeric-menu.js","./pagination/pagination":"node_modules/instantsearch.js/es/widgets/pagination/pagination.js","./range-input/range-input":"node_modules/instantsearch.js/es/widgets/range-input/range-input.js","./search-box/search-box":"node_modules/instantsearch.js/es/widgets/search-box/search-box.js","./range-slider/range-slider":"node_modules/instantsearch.js/es/widgets/range-slider/range-slider.js","./sort-by/sort-by":"node_modules/instantsearch.js/es/widgets/sort-by/sort-by.js","./rating-menu/rating-menu":"node_modules/instantsearch.js/es/widgets/rating-menu/rating-menu.js","./stats/stats":"node_modules/instantsearch.js/es/widgets/stats/stats.js","./toggle-refinement/toggle-refinement":"node_modules/instantsearch.js/es/widgets/toggle-refinement/toggle-refinement.js","./analytics/analytics":"node_modules/instantsearch.js/es/widgets/analytics/analytics.js","./breadcrumb/breadcrumb":"node_modules/instantsearch.js/es/widgets/breadcrumb/breadcrumb.js","./menu-select/menu-select":"node_modules/instantsearch.js/es/widgets/menu-select/menu-select.js","./powered-by/powered-by":"node_modules/instantsearch.js/es/widgets/powered-by/powered-by.js","./panel/panel":"node_modules/instantsearch.js/es/widgets/panel/panel.js","./voice-search/voice-search":"node_modules/instantsearch.js/es/widgets/voice-search/voice-search.js","./query-rule-custom-data/query-rule-custom-data":"node_modules/instantsearch.js/es/widgets/query-rule-custom-data/query-rule-custom-data.js","./query-rule-context/query-rule-context":"node_modules/instantsearch.js/es/widgets/query-rule-context/query-rule-context.js","./index/index":"node_modules/instantsearch.js/es/widgets/index/index.js","./places/places":"node_modules/instantsearch.js/es/widgets/places/places.js"}],"src/templates/result-hit.js":[function(require,module,exports) {
+},{"./clear-refinements/clear-refinements":"node_modules/instantsearch.js/es/widgets/clear-refinements/clear-refinements.js","./configure/configure":"node_modules/instantsearch.js/es/widgets/configure/configure.js","./configure-related-items/configure-related-items":"node_modules/instantsearch.js/es/widgets/configure-related-items/configure-related-items.js","./current-refinements/current-refinements":"node_modules/instantsearch.js/es/widgets/current-refinements/current-refinements.js","./geo-search/geo-search":"node_modules/instantsearch.js/es/widgets/geo-search/geo-search.js","./hierarchical-menu/hierarchical-menu":"node_modules/instantsearch.js/es/widgets/hierarchical-menu/hierarchical-menu.js","./hits/hits":"node_modules/instantsearch.js/es/widgets/hits/hits.js","./hits-per-page/hits-per-page":"node_modules/instantsearch.js/es/widgets/hits-per-page/hits-per-page.js","./infinite-hits/infinite-hits":"node_modules/instantsearch.js/es/widgets/infinite-hits/infinite-hits.js","./menu/menu":"node_modules/instantsearch.js/es/widgets/menu/menu.js","./refinement-list/refinement-list":"node_modules/instantsearch.js/es/widgets/refinement-list/refinement-list.js","./numeric-menu/numeric-menu":"node_modules/instantsearch.js/es/widgets/numeric-menu/numeric-menu.js","./pagination/pagination":"node_modules/instantsearch.js/es/widgets/pagination/pagination.js","./range-input/range-input":"node_modules/instantsearch.js/es/widgets/range-input/range-input.js","./search-box/search-box":"node_modules/instantsearch.js/es/widgets/search-box/search-box.js","./range-slider/range-slider":"node_modules/instantsearch.js/es/widgets/range-slider/range-slider.js","./sort-by/sort-by":"node_modules/instantsearch.js/es/widgets/sort-by/sort-by.js","./rating-menu/rating-menu":"node_modules/instantsearch.js/es/widgets/rating-menu/rating-menu.js","./stats/stats":"node_modules/instantsearch.js/es/widgets/stats/stats.js","./toggle-refinement/toggle-refinement":"node_modules/instantsearch.js/es/widgets/toggle-refinement/toggle-refinement.js","./analytics/analytics":"node_modules/instantsearch.js/es/widgets/analytics/analytics.js","./breadcrumb/breadcrumb":"node_modules/instantsearch.js/es/widgets/breadcrumb/breadcrumb.js","./menu-select/menu-select":"node_modules/instantsearch.js/es/widgets/menu-select/menu-select.js","./powered-by/powered-by":"node_modules/instantsearch.js/es/widgets/powered-by/powered-by.js","./panel/panel":"node_modules/instantsearch.js/es/widgets/panel/panel.js","./voice-search/voice-search":"node_modules/instantsearch.js/es/widgets/voice-search/voice-search.js","./query-rule-custom-data/query-rule-custom-data":"node_modules/instantsearch.js/es/widgets/query-rule-custom-data/query-rule-custom-data.js","./query-rule-context/query-rule-context":"node_modules/instantsearch.js/es/widgets/query-rule-context/query-rule-context.js","./index/index":"node_modules/instantsearch.js/es/widgets/index/index.js","./places/places":"node_modules/instantsearch.js/es/widgets/places/places.js"}],"src/templates/result-hit.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -36170,7 +36664,476 @@ var autocompleteProduct = function autocompleteProduct(hit) {
 
 var _default = autocompleteProduct;
 exports.default = _default;
-},{}],"src/components/autocomplete.js":[function(require,module,exports) {
+},{}],"node_modules/instantsearch.js/es/connectors/hits/connectHitsWithInsights.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _insights = require("../../lib/insights");
+
+var _connectHits = _interopRequireDefault(require("./connectHits"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var connectHitsWithInsights = (0, _insights.withInsights)(_connectHits.default);
+var _default = connectHitsWithInsights;
+exports.default = _default;
+},{"../../lib/insights":"node_modules/instantsearch.js/es/lib/insights/index.js","./connectHits":"node_modules/instantsearch.js/es/connectors/hits/connectHits.js"}],"node_modules/instantsearch.js/es/connectors/infinite-hits/connectInfiniteHitsWithInsights.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _insights = require("../../lib/insights");
+
+var _connectInfiniteHits = _interopRequireDefault(require("./connectInfiniteHits"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var connectInfiniteHitsWithInsights = (0, _insights.withInsights)(_connectInfiniteHits.default);
+var _default = connectInfiniteHitsWithInsights;
+exports.default = _default;
+},{"../../lib/insights":"node_modules/instantsearch.js/es/lib/insights/index.js","./connectInfiniteHits":"node_modules/instantsearch.js/es/connectors/infinite-hits/connectInfiniteHits.js"}],"node_modules/instantsearch.js/es/connectors/autocomplete/connectAutocomplete.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _escapeHighlight = _interopRequireWildcard(require("../../lib/escape-highlight"));
+
+var _utils = require("../../lib/utils");
+
+function _getRequireWildcardCache() { if (typeof WeakMap !== "function") return null; var cache = new WeakMap(); _getRequireWildcardCache = function () { return cache; }; return cache; }
+
+function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } if (obj === null || typeof obj !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
+
+function ownKeys(object, enumerableOnly) {
+  var keys = Object.keys(object);
+
+  if (Object.getOwnPropertySymbols) {
+    var symbols = Object.getOwnPropertySymbols(object);
+    if (enumerableOnly) symbols = symbols.filter(function (sym) {
+      return Object.getOwnPropertyDescriptor(object, sym).enumerable;
+    });
+    keys.push.apply(keys, symbols);
+  }
+
+  return keys;
+}
+
+function _objectSpread(target) {
+  for (var i = 1; i < arguments.length; i++) {
+    var source = arguments[i] != null ? arguments[i] : {};
+
+    if (i % 2) {
+      ownKeys(Object(source), true).forEach(function (key) {
+        _defineProperty(target, key, source[key]);
+      });
+    } else if (Object.getOwnPropertyDescriptors) {
+      Object.defineProperties(target, Object.getOwnPropertyDescriptors(source));
+    } else {
+      ownKeys(Object(source)).forEach(function (key) {
+        Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key));
+      });
+    }
+  }
+
+  return target;
+}
+
+function _defineProperty(obj, key, value) {
+  if (key in obj) {
+    Object.defineProperty(obj, key, {
+      value: value,
+      enumerable: true,
+      configurable: true,
+      writable: true
+    });
+  } else {
+    obj[key] = value;
+  }
+
+  return obj;
+}
+
+var withUsage = (0, _utils.createDocumentationMessageGenerator)({
+  name: 'autocomplete',
+  connector: true
+});
+
+var connectAutocomplete = function connectAutocomplete(renderFn) {
+  var unmountFn = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : _utils.noop;
+  (0, _utils.checkRendering)(renderFn, withUsage());
+  return function (widgetParams) {
+    var _ref = widgetParams || {},
+        _ref$escapeHTML = _ref.escapeHTML,
+        escapeHTML = _ref$escapeHTML === void 0 ? true : _ref$escapeHTML;
+
+    "development" === 'development' ? (0, _utils.warning)(!widgetParams.indices, "\nThe option `indices` has been removed from the Autocomplete connector.\n\nThe indices to target are now inferred from the widgets tree.\n".concat(Array.isArray(widgetParams.indices) ? "\nAn alternative would be:\n\nconst autocomplete = connectAutocomplete(renderer);\n\nsearch.addWidgets([\n  ".concat(widgetParams.indices.map(function (_ref2) {
+      var value = _ref2.value;
+      return "index({ indexName: '".concat(value, "' }),");
+    }).join('\n  '), "\n  autocomplete()\n]);\n") : '', "\n      ")) : void 0;
+    var connectorState = {};
+    return {
+      $$type: 'ais.autocomplete',
+      init: function init(initOptions) {
+        var instantSearchInstance = initOptions.instantSearchInstance;
+        renderFn(_objectSpread({}, this.getWidgetRenderState(initOptions), {
+          instantSearchInstance: instantSearchInstance
+        }), true);
+      },
+      render: function render(renderOptions) {
+        var instantSearchInstance = renderOptions.instantSearchInstance;
+        var renderState = this.getWidgetRenderState(renderOptions);
+        renderState.indices.forEach(function (_ref3) {
+          var sendEvent = _ref3.sendEvent,
+              hits = _ref3.hits;
+          sendEvent('view', hits);
+        });
+        renderFn(_objectSpread({}, renderState, {
+          instantSearchInstance: instantSearchInstance
+        }), false);
+      },
+      getRenderState: function getRenderState(renderState, renderOptions) {
+        return _objectSpread({}, renderState, {
+          autocomplete: this.getWidgetRenderState(renderOptions)
+        });
+      },
+      getWidgetRenderState: function getWidgetRenderState(_ref4) {
+        var _this = this;
+
+        var helper = _ref4.helper,
+            scopedResults = _ref4.scopedResults,
+            instantSearchInstance = _ref4.instantSearchInstance;
+
+        if (!connectorState.refine) {
+          connectorState.refine = function (query) {
+            helper.setQuery(query).search();
+          };
+        }
+
+        var indices = scopedResults.map(function (scopedResult) {
+          // We need to escape the hits because highlighting
+          // exposes HTML tags to the end-user.
+          scopedResult.results.hits = escapeHTML ? (0, _escapeHighlight.default)(scopedResult.results.hits) : scopedResult.results.hits;
+          var sendEvent = (0, _utils.createSendEventForHits)({
+            instantSearchInstance: instantSearchInstance,
+            index: scopedResult.results.index,
+            widgetType: _this.$$type
+          });
+          return {
+            indexId: scopedResult.indexId,
+            indexName: scopedResult.results.index,
+            hits: scopedResult.results.hits,
+            results: scopedResult.results,
+            sendEvent: sendEvent
+          };
+        });
+        return {
+          currentRefinement: helper.state.query || '',
+          indices: indices,
+          refine: connectorState.refine,
+          widgetParams: widgetParams
+        };
+      },
+      getWidgetUiState: function getWidgetUiState(uiState, _ref5) {
+        var searchParameters = _ref5.searchParameters;
+        var query = searchParameters.query || '';
+
+        if (query === '' || uiState && uiState.query === query) {
+          return uiState;
+        }
+
+        return _objectSpread({}, uiState, {
+          query: query
+        });
+      },
+      getWidgetSearchParameters: function getWidgetSearchParameters(searchParameters, _ref6) {
+        var uiState = _ref6.uiState;
+        var parameters = {
+          query: uiState.query || ''
+        };
+
+        if (!escapeHTML) {
+          return searchParameters.setQueryParameters(parameters);
+        }
+
+        return searchParameters.setQueryParameters(_objectSpread({}, parameters, {}, _escapeHighlight.TAG_PLACEHOLDER));
+      },
+      dispose: function dispose(_ref7) {
+        var state = _ref7.state;
+        unmountFn();
+        var stateWithoutQuery = state.setQueryParameter('query', undefined);
+
+        if (!escapeHTML) {
+          return stateWithoutQuery;
+        }
+
+        return stateWithoutQuery.setQueryParameters(Object.keys(_escapeHighlight.TAG_PLACEHOLDER).reduce(function (acc, key) {
+          return _objectSpread({}, acc, _defineProperty({}, key, undefined));
+        }, {}));
+      }
+    };
+  };
+};
+
+var _default = connectAutocomplete;
+exports.default = _default;
+},{"../../lib/escape-highlight":"node_modules/instantsearch.js/es/lib/escape-highlight.js","../../lib/utils":"node_modules/instantsearch.js/es/lib/utils/index.js"}],"node_modules/instantsearch.js/es/connectors/index.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+Object.defineProperty(exports, "connectClearRefinements", {
+  enumerable: true,
+  get: function () {
+    return _connectClearRefinements.default;
+  }
+});
+Object.defineProperty(exports, "connectCurrentRefinements", {
+  enumerable: true,
+  get: function () {
+    return _connectCurrentRefinements.default;
+  }
+});
+Object.defineProperty(exports, "connectHierarchicalMenu", {
+  enumerable: true,
+  get: function () {
+    return _connectHierarchicalMenu.default;
+  }
+});
+Object.defineProperty(exports, "connectHits", {
+  enumerable: true,
+  get: function () {
+    return _connectHits.default;
+  }
+});
+Object.defineProperty(exports, "connectHitsWithInsights", {
+  enumerable: true,
+  get: function () {
+    return _connectHitsWithInsights.default;
+  }
+});
+Object.defineProperty(exports, "connectHitsPerPage", {
+  enumerable: true,
+  get: function () {
+    return _connectHitsPerPage.default;
+  }
+});
+Object.defineProperty(exports, "connectInfiniteHits", {
+  enumerable: true,
+  get: function () {
+    return _connectInfiniteHits.default;
+  }
+});
+Object.defineProperty(exports, "connectInfiniteHitsWithInsights", {
+  enumerable: true,
+  get: function () {
+    return _connectInfiniteHitsWithInsights.default;
+  }
+});
+Object.defineProperty(exports, "connectMenu", {
+  enumerable: true,
+  get: function () {
+    return _connectMenu.default;
+  }
+});
+Object.defineProperty(exports, "connectNumericMenu", {
+  enumerable: true,
+  get: function () {
+    return _connectNumericMenu.default;
+  }
+});
+Object.defineProperty(exports, "connectPagination", {
+  enumerable: true,
+  get: function () {
+    return _connectPagination.default;
+  }
+});
+Object.defineProperty(exports, "connectRange", {
+  enumerable: true,
+  get: function () {
+    return _connectRange.default;
+  }
+});
+Object.defineProperty(exports, "connectRefinementList", {
+  enumerable: true,
+  get: function () {
+    return _connectRefinementList.default;
+  }
+});
+Object.defineProperty(exports, "connectSearchBox", {
+  enumerable: true,
+  get: function () {
+    return _connectSearchBox.default;
+  }
+});
+Object.defineProperty(exports, "connectSortBy", {
+  enumerable: true,
+  get: function () {
+    return _connectSortBy.default;
+  }
+});
+Object.defineProperty(exports, "connectRatingMenu", {
+  enumerable: true,
+  get: function () {
+    return _connectRatingMenu.default;
+  }
+});
+Object.defineProperty(exports, "connectStats", {
+  enumerable: true,
+  get: function () {
+    return _connectStats.default;
+  }
+});
+Object.defineProperty(exports, "connectToggleRefinement", {
+  enumerable: true,
+  get: function () {
+    return _connectToggleRefinement.default;
+  }
+});
+Object.defineProperty(exports, "connectBreadcrumb", {
+  enumerable: true,
+  get: function () {
+    return _connectBreadcrumb.default;
+  }
+});
+Object.defineProperty(exports, "connectGeoSearch", {
+  enumerable: true,
+  get: function () {
+    return _connectGeoSearch.default;
+  }
+});
+Object.defineProperty(exports, "connectPoweredBy", {
+  enumerable: true,
+  get: function () {
+    return _connectPoweredBy.default;
+  }
+});
+Object.defineProperty(exports, "connectConfigure", {
+  enumerable: true,
+  get: function () {
+    return _connectConfigure.default;
+  }
+});
+Object.defineProperty(exports, "EXPERIMENTAL_connectConfigureRelatedItems", {
+  enumerable: true,
+  get: function () {
+    return _connectConfigureRelatedItems.default;
+  }
+});
+Object.defineProperty(exports, "connectAutocomplete", {
+  enumerable: true,
+  get: function () {
+    return _connectAutocomplete.default;
+  }
+});
+Object.defineProperty(exports, "connectQueryRules", {
+  enumerable: true,
+  get: function () {
+    return _connectQueryRules.default;
+  }
+});
+Object.defineProperty(exports, "connectVoiceSearch", {
+  enumerable: true,
+  get: function () {
+    return _connectVoiceSearch.default;
+  }
+});
+
+var _connectClearRefinements = _interopRequireDefault(require("./clear-refinements/connectClearRefinements"));
+
+var _connectCurrentRefinements = _interopRequireDefault(require("./current-refinements/connectCurrentRefinements"));
+
+var _connectHierarchicalMenu = _interopRequireDefault(require("./hierarchical-menu/connectHierarchicalMenu"));
+
+var _connectHits = _interopRequireDefault(require("./hits/connectHits"));
+
+var _connectHitsWithInsights = _interopRequireDefault(require("./hits/connectHitsWithInsights"));
+
+var _connectHitsPerPage = _interopRequireDefault(require("./hits-per-page/connectHitsPerPage"));
+
+var _connectInfiniteHits = _interopRequireDefault(require("./infinite-hits/connectInfiniteHits"));
+
+var _connectInfiniteHitsWithInsights = _interopRequireDefault(require("./infinite-hits/connectInfiniteHitsWithInsights"));
+
+var _connectMenu = _interopRequireDefault(require("./menu/connectMenu"));
+
+var _connectNumericMenu = _interopRequireDefault(require("./numeric-menu/connectNumericMenu"));
+
+var _connectPagination = _interopRequireDefault(require("./pagination/connectPagination"));
+
+var _connectRange = _interopRequireDefault(require("./range/connectRange"));
+
+var _connectRefinementList = _interopRequireDefault(require("./refinement-list/connectRefinementList"));
+
+var _connectSearchBox = _interopRequireDefault(require("./search-box/connectSearchBox"));
+
+var _connectSortBy = _interopRequireDefault(require("./sort-by/connectSortBy"));
+
+var _connectRatingMenu = _interopRequireDefault(require("./rating-menu/connectRatingMenu"));
+
+var _connectStats = _interopRequireDefault(require("./stats/connectStats"));
+
+var _connectToggleRefinement = _interopRequireDefault(require("./toggle-refinement/connectToggleRefinement"));
+
+var _connectBreadcrumb = _interopRequireDefault(require("./breadcrumb/connectBreadcrumb"));
+
+var _connectGeoSearch = _interopRequireDefault(require("./geo-search/connectGeoSearch"));
+
+var _connectPoweredBy = _interopRequireDefault(require("./powered-by/connectPoweredBy"));
+
+var _connectConfigure = _interopRequireDefault(require("./configure/connectConfigure"));
+
+var _connectConfigureRelatedItems = _interopRequireDefault(require("./configure-related-items/connectConfigureRelatedItems"));
+
+var _connectAutocomplete = _interopRequireDefault(require("./autocomplete/connectAutocomplete"));
+
+var _connectQueryRules = _interopRequireDefault(require("./query-rules/connectQueryRules"));
+
+var _connectVoiceSearch = _interopRequireDefault(require("./voice-search/connectVoiceSearch"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+},{"./clear-refinements/connectClearRefinements":"node_modules/instantsearch.js/es/connectors/clear-refinements/connectClearRefinements.js","./current-refinements/connectCurrentRefinements":"node_modules/instantsearch.js/es/connectors/current-refinements/connectCurrentRefinements.js","./hierarchical-menu/connectHierarchicalMenu":"node_modules/instantsearch.js/es/connectors/hierarchical-menu/connectHierarchicalMenu.js","./hits/connectHits":"node_modules/instantsearch.js/es/connectors/hits/connectHits.js","./hits/connectHitsWithInsights":"node_modules/instantsearch.js/es/connectors/hits/connectHitsWithInsights.js","./hits-per-page/connectHitsPerPage":"node_modules/instantsearch.js/es/connectors/hits-per-page/connectHitsPerPage.js","./infinite-hits/connectInfiniteHits":"node_modules/instantsearch.js/es/connectors/infinite-hits/connectInfiniteHits.js","./infinite-hits/connectInfiniteHitsWithInsights":"node_modules/instantsearch.js/es/connectors/infinite-hits/connectInfiniteHitsWithInsights.js","./menu/connectMenu":"node_modules/instantsearch.js/es/connectors/menu/connectMenu.js","./numeric-menu/connectNumericMenu":"node_modules/instantsearch.js/es/connectors/numeric-menu/connectNumericMenu.js","./pagination/connectPagination":"node_modules/instantsearch.js/es/connectors/pagination/connectPagination.js","./range/connectRange":"node_modules/instantsearch.js/es/connectors/range/connectRange.js","./refinement-list/connectRefinementList":"node_modules/instantsearch.js/es/connectors/refinement-list/connectRefinementList.js","./search-box/connectSearchBox":"node_modules/instantsearch.js/es/connectors/search-box/connectSearchBox.js","./sort-by/connectSortBy":"node_modules/instantsearch.js/es/connectors/sort-by/connectSortBy.js","./rating-menu/connectRatingMenu":"node_modules/instantsearch.js/es/connectors/rating-menu/connectRatingMenu.js","./stats/connectStats":"node_modules/instantsearch.js/es/connectors/stats/connectStats.js","./toggle-refinement/connectToggleRefinement":"node_modules/instantsearch.js/es/connectors/toggle-refinement/connectToggleRefinement.js","./breadcrumb/connectBreadcrumb":"node_modules/instantsearch.js/es/connectors/breadcrumb/connectBreadcrumb.js","./geo-search/connectGeoSearch":"node_modules/instantsearch.js/es/connectors/geo-search/connectGeoSearch.js","./powered-by/connectPoweredBy":"node_modules/instantsearch.js/es/connectors/powered-by/connectPoweredBy.js","./configure/connectConfigure":"node_modules/instantsearch.js/es/connectors/configure/connectConfigure.js","./configure-related-items/connectConfigureRelatedItems":"node_modules/instantsearch.js/es/connectors/configure-related-items/connectConfigureRelatedItems.js","./autocomplete/connectAutocomplete":"node_modules/instantsearch.js/es/connectors/autocomplete/connectAutocomplete.js","./query-rules/connectQueryRules":"node_modules/instantsearch.js/es/connectors/query-rules/connectQueryRules.js","./voice-search/connectVoiceSearch":"node_modules/instantsearch.js/es/connectors/voice-search/connectVoiceSearch.js"}],"src/templates/autocomplete-suggestions.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _algoliasearch = _interopRequireDefault(require("algoliasearch"));
+
+var _instantsearch = _interopRequireDefault(require("instantsearch.js"));
+
+var _connectors = require("instantsearch.js/es/connectors");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var renderQSHits = function renderQSHits(_ref, isFirstRender) {
+  var widgetParams = _ref.widgetParams,
+      hits = _ref.hits;
+  var container = document.querySelector(widgetParams.container);
+  container.innerHTML = "<ul>\n    ".concat(hits.map(function (item) {
+    return "\n        <li>".concat(_instantsearch.default.highlight({
+      hit: item,
+      attribute: 'query'
+    }), "</li>\n      ");
+  }).join(''), "\n  </ul>");
+};
+
+var QSHits = (0, _connectors.connectHits)(renderQSHits);
+var _default = QSHits;
+exports.default = _default;
+},{"algoliasearch":"node_modules/algoliasearch/src/browser/builds/algoliasearch.js","instantsearch.js":"node_modules/instantsearch.js/es/index.js","instantsearch.js/es/connectors":"node_modules/instantsearch.js/es/connectors/index.js"}],"src/components/autocomplete.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -36185,6 +37148,8 @@ var _instantsearch = _interopRequireDefault(require("instantsearch.js"));
 var _widgets = require("instantsearch.js/es/widgets");
 
 var _autocompleteProduct = _interopRequireDefault(require("../templates/autocomplete-product"));
+
+var _autocompleteSuggestions = _interopRequireDefault(require("../templates/autocomplete-suggestions"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -36241,13 +37206,20 @@ function () {
       this._searchInstance.addWidgets([(0, _widgets.configure)({
         hitsPerPage: 3
       }), (0, _widgets.searchBox)({
-        container: '#searchbox'
+        container: '#searchbox',
+        showSubmit: true
       }), (0, _widgets.hits)({
         container: '#autocomplete-hits',
         templates: {
           item: _autocompleteProduct.default
         }
-      })]);
+      }), (0, _widgets.index)({
+        indexName: 'product_suggestions'
+      }).addWidgets([(0, _widgets.configure)({
+        hitsPerPage: 4
+      }), (0, _autocompleteSuggestions.default)({
+        container: '#autocomplete-suggestions'
+      })])]);
     }
     /**
      * @private
@@ -36258,7 +37230,8 @@ function () {
   }, {
     key: "_startSearch",
     value: function _startSearch() {
-      this._searchInstance.start();
+      this._searchInstance.start(); // this._searchSuggestions.start();
+
     }
   }]);
 
@@ -36267,7 +37240,7 @@ function () {
 
 var _default = Autocomplete;
 exports.default = _default;
-},{"algoliasearch":"node_modules/algoliasearch/src/browser/builds/algoliasearch.js","instantsearch.js":"node_modules/instantsearch.js/es/index.js","instantsearch.js/es/widgets":"node_modules/instantsearch.js/es/widgets/index.js","../templates/autocomplete-product":"src/templates/autocomplete-product.js"}],"src/app.js":[function(require,module,exports) {
+},{"algoliasearch":"node_modules/algoliasearch/src/browser/builds/algoliasearch.js","instantsearch.js":"node_modules/instantsearch.js/es/index.js","instantsearch.js/es/widgets":"node_modules/instantsearch.js/es/widgets/index.js","../templates/autocomplete-product":"src/templates/autocomplete-product.js","../templates/autocomplete-suggestions":"src/templates/autocomplete-suggestions.js"}],"src/app.js":[function(require,module,exports) {
 "use strict";
 
 var _resultsPage = _interopRequireDefault(require("./components/results-page"));
@@ -36345,7 +37318,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "57507" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "58793" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};
