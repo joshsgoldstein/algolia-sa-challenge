@@ -20,7 +20,7 @@
   position: fixed;
   display: flex;
   width: 100%;
-  background: #252321;
+  background: #000000;
   padding: 1rem 2rem;
   margin-bottom: 1rem;
   justify-content: center;
@@ -48,11 +48,21 @@
   height: 32px;
   flex-grow: 1;
   margin-left: 5%;
+  
+}
+
+.header__searchbox {
+  border-radius: 8px;
+  background: linear-gradient(
+      -180deg,
+      hsla(0, 0%, 100%, 0),
+      hsla(0, 0%, 100%, 0.8)
+    )
+    #ebecf3;
+  /* box-shadow: 0 20px 44px 0 rgb(255, 255, 255); */
 }
 
 .header__searchbox input {
-  border-radius: 2px;
-  background-color: #fff;
   padding: 8px 26px;
 }
 
@@ -60,25 +70,76 @@
   outline: none;
   border: 1px solid #252321;
   border-bottom: 0;
-  border-radius: 2px 2px 0 0;
+  
 }
 
 /* Autocomplete */
 .autocomplete {
   display: none;
-  background-color: #fff;
+  background: linear-gradient(
+      -180deg,
+      hsla(0, 0%, 100%, 0),
+      hsla(0, 0%, 100%, 0.8)
+    )
+    #ebecf3;
   padding: 20px;
   z-index: 99;
   margin-top: -32px;
-  border-radius: 0 0 2px 2px;
-  box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
-  border: 1px solid #252321;
+  box-shadow: 0 20px 44px 0 rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
   border-top: 0;
 }
 
 .autocomplete_container {
   display: flex;
   width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+}
+
+@media (max-width: 1130px) {
+  .autocomplete_container {
+    width: 100vw;
+  }
+}
+
+.autocomplete_container .column {
+  text-align: center;
+  font-weight: normal;
+  position: relative;
+  padding: 12px 16px;
+}
+
+.autocomplete_container .column ol,ul{
+  list-style: none;
+}
+.autocomplete_container .product-column {
+  text-align: center;
+  font-weight: normal;
+  position: relative;
+  padding: 12px 16px;
+}
+
+.autocomplete_container .product {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.autocomplete_container .column:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 1px;
+  height: 100%;
+  background-color: #aaa;
+  opacity: 0.5;
+}
+
+.autocomplete_container .column h2 {
+  font-weight: normal;
+  font-size: 24px;
+  margin-bottom: 16px;
 }
 
 .autocomplete-product {
@@ -152,6 +213,7 @@
   margin: 2rem auto;
   text-align: center;
 }
+
 
 
 /*# sourceMappingURL=/app.d930d8e6.css.map */

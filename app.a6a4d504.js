@@ -36547,7 +36547,7 @@ Object.defineProperty(exports, "__esModule", {
 exports.default = void 0;
 
 var resultHit = function resultHit(hit) {
-  return "<div class=\"result-hit\">\n  <div class=\"result-hit__image-container\">\n    <img class=\"result-hit__image\" src=\"".concat(hit.image, "\" />\n  </div>\n  <div class=\"result-hit__details\">\n    <h3 class=\"result-hit__name\">").concat(hit._highlightResult.name.value, "</h3>\n    <p class=\"result-hit__price\">$").concat(hit.price, "</p>\n  </div>\n</div>");
+  return "<div class=\"result-hit\">\n<a href=\"".concat(hit.url, "\">\n  <div class=\"result-hit__image-container\">\n    <img class=\"result-hit__image\" src=\"").concat(hit.image, "\" />\n  </div>\n  <div class=\"result-hit__details\">\n    <h3 class=\"result-hit__name\">").concat(hit._highlightResult.name.value, "</h3>\n    <p class=\"result-hit__price\">$").concat(hit.price, "</p>\n  </div>\n  </a>\n</div>");
 };
 
 var _default = resultHit;
@@ -36627,9 +36627,38 @@ function () {
       }), (0, _widgets.refinementList)({
         container: '#brand-facet',
         attribute: 'brand'
-      }), (0, _widgets.refinementList)({
+      }), (0, _widgets.numericMenu)({
+        container: '#price-slider',
+        attribute: 'price',
+        items: [{
+          label: 'All'
+        }, {
+          label: 'Less than $100',
+          end: 100
+        }, {
+          label: 'Between $100 - $500',
+          start: 100,
+          end: 500
+        }, {
+          label: 'Between $500 - $1000',
+          start: 500,
+          end: 1000
+        }, {
+          label: 'More than $1000',
+          start: 1000
+        }]
+      }), (0, _widgets.hierarchicalMenu)({
         container: '#categories-facet',
-        attribute: 'categories'
+        attributes: ['hierarchicalCategories.lvl0', 'hierarchicalCategories.lvl1', 'hierarchicalCategories.lvl2']
+      }), (0, _widgets.ratingMenu)({
+        container: '#rating-menu',
+        attribute: 'rating'
+      }), (0, _widgets.toggleRefinement)({
+        container: '#toggle-refinement',
+        attribute: 'free_shipping',
+        templates: {
+          labelText: 'Free shipping'
+        }
       })]);
     }
     /**
@@ -37209,7 +37238,7 @@ function () {
         container: '#searchbox',
         showSubmit: true
       }), (0, _widgets.hits)({
-        container: '#autocomplete-hits',
+        container: '#products',
         templates: {
           item: _autocompleteProduct.default
         }
@@ -37218,7 +37247,7 @@ function () {
       }).addWidgets([(0, _widgets.configure)({
         hitsPerPage: 4
       }), (0, _autocompleteSuggestions.default)({
-        container: '#autocomplete-suggestions'
+        container: '#suggestions'
       })])]);
     }
     /**
@@ -37318,7 +37347,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "58793" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "64444" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};
