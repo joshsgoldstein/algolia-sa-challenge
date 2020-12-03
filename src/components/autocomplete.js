@@ -54,7 +54,7 @@ class Autocomplete {
         showSubmit: true
       }),
       hits({
-        container: '#autocomplete-hits',
+        container: '#products',
         templates: { item: autocompleteProductTemplate },
       }),
       index({
@@ -64,7 +64,7 @@ class Autocomplete {
           hitsPerPage: 4,
         }),
         QSHits({
-          container: '#autocomplete-suggestions',
+          container: '#suggestions',
         }),
       ]),
     ]);
