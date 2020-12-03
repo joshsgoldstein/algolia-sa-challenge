@@ -214,6 +214,18 @@
   text-align: center;
 }
 
+.stats-container {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr 1fr;
+}
+
+.stats-container .stat  {
+  text-align: left;
+  font-weight: normal;
+  position: relative;
+  padding: 10px 10px;
+}
+
 
 
 /*# sourceMappingURL=/app.d930d8e6.css.map */

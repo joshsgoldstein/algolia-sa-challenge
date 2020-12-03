@@ -36605,7 +36605,8 @@ function () {
       this._searchClient = (0, _algoliasearch.default)('STUNKNEZ7U', '6fd8be68ce099ddf825e764575b2b44c');
       this._searchInstance = (0, _instantsearch.default)({
         indexName: 'product_catalog',
-        searchClient: this._searchClient
+        searchClient: this._searchClient,
+        routing: true
       });
     }
     /**
@@ -36659,6 +36660,12 @@ function () {
         templates: {
           labelText: 'Free shipping'
         }
+      }), (0, _widgets.clearRefinements)({
+        container: '#clear-refinements'
+      }), (0, _widgets.currentRefinements)({
+        container: '#current-refinements'
+      }), (0, _widgets.stats)({
+        container: '#search-stats'
       })]);
     }
     /**
@@ -37220,7 +37227,8 @@ function () {
       this._searchClient = (0, _algoliasearch.default)('STUNKNEZ7U', '6fd8be68ce099ddf825e764575b2b44c');
       this._searchInstance = (0, _instantsearch.default)({
         indexName: 'product_catalog',
-        searchClient: this._searchClient
+        searchClient: this._searchClient,
+        routing: true
       });
     }
     /**
@@ -37347,7 +37355,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "64444" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "59153" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};
